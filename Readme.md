@@ -30,4 +30,9 @@ A text-based Formula 1 race simulation game written in Rust.
 
 ### Screenshots
 
+#### Ncurses
 ![NCurses UI](imgs/ncurses_ui.png)
+
+
+#### Web client
+![Web UI](imgs/web_ui.jpg)

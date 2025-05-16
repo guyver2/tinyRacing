@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny Racing WebUI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+        }
+        body {
+            background-color: #f0f5f9;
+            color: #2d4059;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #c9d6df;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .race-info {
+            font-size: 1.2em;
+        }
+        .race-status {
+            text-align: right;
+        }
+        .cars-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: #f9f7f7;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .cars-table th {
+            background-color: #dbe2ef;
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #c9d6df;
+        }
+        .cars-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        .track-line-container {
+            position: relative;
+            height: 80px;
+            margin: 20px 0;
+            border: 1px solid #dbe2ef;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #f9f7f7;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .track-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #a5b1c2;
+            transform: translateY(-50%);
+        }
+        .track-container {
+            position: relative;
+            margin: 20px 0;
+            border: 1px solid #dbe2ef;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #f9f7f7;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .car-marker {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            transition: left 0.3s ease-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 2px solid white;
+        }
+        
+        /* Pastel Team Colors */
+        .team-1 { color: #2d4059; background-color: #aed9e0; } /* Pastel Blue */
+        .team-2 { color: #2d4059; background-color: #ffa5a5; } /* Pastel Red */
+        .team-3 { color: #2d4059; background-color: #b5e8b5; } /* Pastel Green */
+        .team-4 { color: #2d4059; background-color: #ffe3a3; } /* Pastel Yellow */
+        .team-5 { color: #2d4059; background-color: #739ff2; } /* Pastel Purple */
+        
+        /* Pastel Tire Colors */
+        .tire-soft { color: #e84545; } /* Softer Red */
+        .tire-medium { color: #f9a826; } /* Softer Yellow */
+        .tire-hard { color: #4d4d4d; } /* Softer White/Gray */
+        .tire-intermediate { color: #7bc74d; } /* Softer Green */
+        .tire-wet { color: #5c7aea; } /* Softer Blue */
+        
+        .top-3 {
+            font-weight: bold;
+            /*background-color: #fafcf9;*/
+        }
+        .connection-status {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .connected {
+            background-color: #b5e8b5;
+            color: #2d4059;
+        }
+        .disconnected {
+            background-color: #ffa5a5;
+            color: #2d4059;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="race-info">Race: <span id="track-name">Loading...</span> Time elapsed: <span id="time-elapsed">0.0s</span></div>
+        <div class="race-status">Status: <span id="race-status">Loading...</span> Lap: <span id="current-lap">0</span>/<span id="total-laps">0</span></div>
+    </header>
+    
+    <table class="cars-table">
+        <thead>
+            <tr>
+                <th>Pos</th>
+                <th>Car#</th>
+                <th>Driver</th>
+                <th>Team</th>
+                <th>Tire</th>
+                <th>Wear</th>
+                <th>Fuel</th>
+                <th>Lap#</th>
+                <th>Lap%</th>
+                <th>Status</th>
+                <th>Style</th>
+                <th>Speed</th>
+            </tr>
+        </thead>
+        <tbody id="cars-data">
+            <tr>
+                <td colspan="12" style="text-align: center;">Waiting for race data...</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="track-line-container">
+        <div class="track-line"></div>
+        <div id="car-markers"></div>
+    </div>
+
+    <div class="track-container">
+        <svg
+        width="480.09"
+        height="751.35999"
+        id="bugatti-track"
+        sodipodi:version="0.32"
+        inkscape:version="1.3.2 (091e20e, 2023-11-25)"
+        sodipodi:docname="bugatti.svg"
+        inkscape:output_extension="org.inkscape.output.svg.inkscape"
+        version="1.0"
+        xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+        xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+        xmlns="http://www.w3.org/2000/svg"
+        xmlns:svg="http://www.w3.org/2000/svg"
+        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        xmlns:cc="http://creativecommons.org/ns#"
+        xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <defs
+        id="defs2227" />
+        <sodipodi:namedview
+        id="base"
+        pagecolor="#ffffff"
+        bordercolor="#666666"
+        borderopacity="1.0"
+        gridtolerance="10000"
+        guidetolerance="10"
+        objecttolerance="10"
+        inkscape:pageopacity="0.0"
+        inkscape:pageshadow="2"
+        inkscape:zoom="1.9499644"
+        inkscape:cx="311.28773"
+        inkscape:cy="381.54542"
+        inkscape:document-units="px"
+        inkscape:current-layer="layer1"
+        inkscape:window-width="2480"
+        inkscape:window-height="1387"
+        inkscape:window-x="80"
+        inkscape:window-y="25"
+        width="480.09px"
+        height="751.36px"
+        inkscape:showpageshadow="2"
+        inkscape:pagecheckerboard="0"
+        inkscape:deskcolor="#d1d1d1"
+        inkscape:window-maximized="1" />
+        <metadata
+        id="metadata2230">
+        <rdf:RDF>
+        <cc:Work
+            rdf:about="">
+            <dc:format>image/svg+xml</dc:format>
+            <dc:type
+                rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        </cc:Work>
+        </rdf:RDF>
+        </metadata>
+        <g
+        inkscape:label="Layer 1"
+        inkscape:groupmode="layer"
+        id="layer1">
+        <path
+            style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#b3b3b3;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            d="M 246.34909,73.694688 C 246.34909,73.694688 253.27084,78.176713 254.17282,81.499652 C 253.21165,84.708653 250.48142,88.428906 247.86037,90.739255 L 198.42386,121.61937 C 247.86037,90.739255 197.94271,120.80169 196.51381,122.81247 C 195.08491,124.82325 194.19283,125.89485 192.70824,129.6625 C 191.38668,133.01639 191.7949,133.08752 193.7738,136.96921 C 195.7527,140.8509 197.31298,143.09618 200.62383,145.18925 C 206.5872,148.80361 213.73047,140.95344 217.48065,137.2016 C 228.82126,125.5946 252.37966,98.913445 252.37966,98.913445 C 252.37966,98.913445 255.88079,97.391215 258.46858,97.543435 C 261.05638,97.695655 261.39888,97.809825 261.96971,100.5879 C 262.54055,103.36597 261.51304,107.59016 261.51304,107.59016 C 261.51304,107.59016 261.1713,107.93298 260.53615,108.57288 C 253.91463,115.24393 215.40441,154.20255 199.76965,173.61931 C 196.88185,177.20566 193.0045,180.49817 193.62158,181.72277 C 194.43514,183.33729 194.98974,183.85819 196.55858,187.73061 C 197.4117,189.83638 199.01244,192.0957 199.1016,194.05284 C 199.52584,203.21253 184.18375,232.26082 184.18375,232.26082 C 184.18375,232.26082 179.85156,239.91394 175.81148,240.78531 C 171.7714,241.65668 172.3899,239.08941 168.02345,235.74631 C 165.9345,234.14694 163.39453,229.70553 161.35029,229.52081 C 155.46825,228.9893 157.88722,228.98803 154.8047,229.97748 C 151.72218,230.96693 152.93997,230.4722 149.62912,232.56527 C 146.31827,234.65833 143.95881,235.03889 141.5613,238.34974 C 139.16379,241.66059 141.75158,243.29699 140.03907,245.80867 C 138.32656,248.32035 134.71126,248.39646 134.71126,248.39646"
+            id="path3284"
+            sodipodi:nodetypes="ccccssscccsscssssscsssssssc" />
+        <path
+            style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            d="m 211.99595,63.423122 c 5.24603,-3.16556 16.34358,10.880756 20.67896,7.891506 4.33538,-2.98925 3.59541,-1.30584 5.56495,-6.93364 0.88959,-2.54193 0.64005,-10.43674 1.46539,-13.30523 0.93308,-3.24294 0.8478,-2.2723 0.8478,-2.2723 5.21142,-7.87466 25.02021,-14.87491 34.36981,-15.81648 7.12376,-0.71741 7.00998,8.62033 10.8807,13.51398 3.69618,9.81568 7.04462,18.16933 10.54498,29.69464 7.00463,23.063545 14.61304,47.624722 14.61304,47.624722 l 5.14315,28.36413 21.84789,138.11623 c 0,0 0.6836,2.99433 0.33922,5.03137 -0.34438,2.03704 -0.50281,1.20975 -1.71676,3.11679 -2.35631,3.70161 -5.67132,10.0303 -4.78911,15.23825 1.02656,6.06014 5.79769,7.59979 9.91886,10.06267 1.24434,0.74363 3.12841,1.04104 3.43428,2.63324 0.33973,1.76846 0,0 0.72415,3.27108 l 33.95105,153.36136 c 0,0 -1.9031,1.25455 2.84997,6.78925 4.75307,5.53471 13.04723,8.25172 13.10998,14.84086 0.0778,8.16518 -7.91142,11.33729 -7.397,18.4293 0.51328,7.07637 0,0 0.92564,9.26732 l 9.44609,69.10616 5.18218,64.6587 0.0757,21.68432 c 0,0 -0.35556,3.0497 -1.18139,5.0112 -0.78722,1.86978 -0.22998,2.81955 -5.75362,2.36966 -11.31826,-0.92187 -37.42469,-10.15498 -37.42469,-10.15498 0,0 -45.3788,-19.22303 -87.22349,-47.68298 -34.93961,-23.76357 -68.47927,-55.3858 -78.59708,-65.17512 -1.99957,-1.93465 -2.21674,-1.45269 -3.08435,-3.01657 -0.86761,-1.56388 -0.45667,-0.91334 -0.84276,-4.1523 l -1.55234,-15.94062 -33.08583,2.17234 c 0,0 -1.35715,-16.07235 -3.18784,-30.89043 -1.83069,-14.81809 -5.20047,-28.22969 -5.20047,-28.22969 0,0 -6.8869,-17.95149 -16.79037,-30.44873 -4.42801,-5.58773 -12.80708,-6.04575 -16.78116,-9.34436 -4.91416,-4.07891 -7.34381,-7.22627 -5.99425,-15.94401 1.34957,-8.71775 12.40995,-18.92698 12.40995,-18.92698 0,0 8.00632,-4.49575 12.4679,-9.91908 4.46158,-5.42333 4.22145,-3.30702 2.3261,-17.37016 -0.96836,-7.1851 -9.01415,-12.08201 -15.39616,-18.94651 -6.65387,-7.15689 -8.01503,-4.26659 -10.18146,-11.48802 -1.86234,-6.20781 1.1876,-7.90824 4.16796,-11.51252 3.81199,-4.61 7.27486,-4.45499 7.48459,-9.04832 0.21912,-4.799 0,0 0.0897,-7.71211 l 0.52233,-59.62508 c -0.0136,-2.63414 0.29969,-11.03798 -1.4955,-13.92921 -1.79519,-2.89123 -4.67342,-2.08226 -4.92414,-4.63797 -0.25072,-2.55571 3.36078,-3.14334 2.39903,-5.7371 -0.96175,-2.59377 -4.64171,-3.1329 -6.85492,-6.1602 -2.21321,-3.0273 -0.78014,-5.7968 -0.78014,-5.7968 0,0 0.38828,-10.95356 1.54954,-25.37619 0.80527,-10.00128 1.98224,-21.67071 3.65919,-32.51258 1.96931,-12.73203 4.73761,-20.83827 7.11125,-30.48596 7.30971,-29.71043 17.73595,-30.11047 17.73595,-30.11047 8.65997,-6.44653 18.82381,-10.78455 27.20395,-17.486107 3.28812,-2.67476 3.13476,-2.66964 7.68263,-5.461639 0.39322,-0.2414 4.43644,1.707709 4.85927,1.397979 6.37018,-4.666247 1.61282,-7.119783 7.259,-10.660513 5.64618,-3.54073 8.58928,4.787115 13.37505,-0.596679 2.2864,-2.572101 2.26377,-8.371388 3.6805,-13.177258 1.54869,-5.253537 5.59744,-6.008943 8.33719,-7.662161 z"
+            id="track"
+            sodipodi:nodetypes="cssscscscccssssscczssccccsscssscccscssscssssssccsssscsssccssssssc" />
+        <path
+            d="M 403.45428,395.09586 L 412.39993,394.13689 L 409.57137,411.38468 L 403.45428,395.09586 z "
+            style="fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            id="path6224" />
+        <path
+            d="M 98.586093,217.91468 L 90.014279,215.18187 L 99.562983,200.54258 L 98.586093,217.91468 z "
+            style="fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            id="path7195" />
+        <text
+            x="404.89606"
+            y="719.2511"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            id="text9334"
+            xml:space="preserve"><tspan
+            style="font-family:Arial"
+            x="404.89606"
+            y="719.2511"
+            id="tspan9336">Mulsanne</tspan></text>
+        <g
+            transform="matrix(0.4629199,0.6713519,-0.6713519,0.4629199,-4.5305219,-215.53231)"
+            id="g12355">
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.13138"
+            y="-225.66817"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect9376" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.13843"
+            y="-210.80884"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect10347" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.22794"
+            y="-233.16934"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect10349" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.10162"
+            y="-221.97508"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect10351" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.14481"
+            y="-229.39552"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12293" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.1427"
+            y="-214.46121"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12295" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.14166"
+            y="-206.99403"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12297" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.87115"
+            y="-233.22285"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12299" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.1145"
+            y="-203.19873"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12301" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="503.12387"
+            y="-218.21779"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12303" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.6814"
+            y="-221.93484"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12321" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.68845"
+            y="-207.07552"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12323" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.77795"
+            y="-229.43602"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12325" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.65164"
+            y="-218.24176"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12327" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.69482"
+            y="-225.6622"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12329" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.69272"
+            y="-210.72789"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12331" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.69168"
+            y="-203.26071"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12333" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="506.67389"
+            y="-214.48447"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12335" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.23587"
+            y="-225.71014"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12337" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.24292"
+            y="-210.85081"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12339" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.33243"
+            y="-233.21132"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12341" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.20612"
+            y="-222.01706"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12343" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.2493"
+            y="-229.4375"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12345" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.24719"
+            y="-214.50319"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12347" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.24615"
+            y="-207.03601"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12349" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.22836"
+            y="-218.25977"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12351" />
+        <rect
+            width="3.6360872"
+            height="3.794178"
+            x="510.32791"
+            y="-203.24594"
+            transform="matrix(0.7650015,0.6440285,-0.6440285,0.7650015,0,0)"
+            style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.29999995;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+            id="rect12353" />
+        </g>
+        <text
+            x="218.50485"
+            y="552.00568"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:'Arial Narrow';fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            id="text10557"
+            xml:space="preserve"><tspan
+            style="font-family:Arial"
+            x="218.50485"
+            y="552.00568"
+            id="tspan10559">Virage D'Indianapolis</tspan></text>
+        <text
+            x="73.328812"
+            y="563.21393"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            id="text10571"
+            xml:space="preserve"><tspan
+            style="font-family:Arial"
+            x="73.328812"
+            y="563.21393"
+            id="tspan10573">Virage D'Arnage</tspan></text>
+        <text
+            id="text10575"
+            y="448.43304"
+            x="35.415775"
+            style="font-style:normal;font-weight:normal;line-height:0%;font-family:'Bitstream Vera Sans';fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            xml:space="preserve"><tspan
+            y="448.43304"
+            x="35.415775"
+            id="tspan10577"
+            sodipodi:role="line"
+            style="font-size:12px;line-height:1.25">Virage Porsche</tspan></text>
+        <text
+            id="text10713"
+            y="131.57816"
+            x="61.29903"
+            style="font-style:normal;font-weight:normal;line-height:0%;font-family:'Bitstream Vera Sans';fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            xml:space="preserve"><tspan
+            y="131.57816"
+            x="61.29903"
+            id="tspan10715"
+            sodipodi:role="line"
+            style="font-size:12px;line-height:1.25">Course Dunlop</tspan></text>
+        <g
+            id="g10727"
+            transform="translate(-25.544419,-217.67856)">
+        <text
+            xml:space="preserve"
+            id="text10717"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            y="399.28006"
+            x="398.72665"><tspan
+                id="tspan10719"
+                y="399.28006"
+                x="398.72665"
+                style="font-family:Arial">Ligne Droite </tspan></text>
+        <text
+            id="text10721"
+            xml:space="preserve"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            y="412.47336"
+            x="386.4278"><tspan
+                id="tspan10723"
+                y="412.47336"
+                x="386.4278"
+                style="font-family:Arial">des Hunaudieres</tspan></text>
+        <path
+            sodipodi:nodetypes="cc"
+            id="path10725"
+            d="M 454.76921,402.98743 C 457.61375,405.8607 456.74802,404.89877 456.74802,404.89877"
+            style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+        </g>
+        <g
+            id="g10734"
+            transform="translate(-105.87969,16.556145)">
+        <text
+            xml:space="preserve"
+            id="text10736"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            y="399.28006"
+            x="398.72665"><tspan
+                id="tspan10738"
+                y="399.28006"
+                x="398.72665"
+                style="font-family:Arial">Ligne Droite </tspan></text>
+        <text
+            id="text10740"
+            xml:space="preserve"
+            style="font-style:normal;font-weight:normal;font-size:12px;line-height:0%;font-family:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            y="412.47336"
+            x="386.4278"><tspan
+                id="tspan10742"
+                y="412.47336"
+                x="386.4278"
+                style="font-family:Arial">des Hunaudieres</tspan></text>
+        <path
+            sodipodi:nodetypes="cc"
+            id="path10744"
+            d="M 454.76921,402.98743 C 457.61375,405.8607 456.74802,404.89877 456.74802,404.89877"
+            style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+        </g>
+        <text
+            xml:space="preserve"
+            style="font-style:normal;font-weight:normal;line-height:0%;font-family:'Bitstream Vera Sans';fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            x="344.40939"
+            y="20.552509"
+            id="text10746"><tspan
+            sodipodi:role="line"
+            id="tspan10748"
+            x="344.40939"
+            y="20.552509"
+            style="font-size:12px;line-height:1.25;text-align:center;text-anchor:middle">Virage Du</tspan><tspan
+            sodipodi:role="line"
+            x="344.40939"
+            y="35.552509"
+            id="tspan10750"
+            style="font-size:12px;line-height:1.25;text-align:center;text-anchor:middle">Tertre Rouge</tspan></text>
+        <text
+            id="text2297"
+            y="259.77106"
+            x="56.346714"
+            style="font-style:normal;font-weight:normal;line-height:0%;font-family:'Bitstream Vera Sans';fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            xml:space="preserve"><tspan
+            y="259.77106"
+            x="56.346714"
+            id="tspan2299"
+            sodipodi:role="line"
+            style="font-size:12px;line-height:1.25">Virages Ford</tspan></text>
+        </g>
+        </svg>
+    </div>
+    
+    <div id="connection-status" class="connection-status disconnected">Disconnected</div>
+
+    <script>
+        const teamColors = {
+            'Red Bull': '#aed9e0',
+            'Ferrari': '#ffa5a5',
+            'Mercedes': '#b5e8b5',
+            'McLaren': '#ffe3a3',
+            'Alpine': '#739ff2'
+        };
+        const socket = new WebSocket('ws://127.0.0.1:3030/ws');
+        const statusElement = document.getElementById('connection-status');
+        const trackNameElement = document.getElementById('track-name');
+        const timeElapsedElement = document.getElementById('time-elapsed');
+        const raceStatusElement = document.getElementById('race-status');
+        const currentLapElement = document.getElementById('current-lap');
+        const totalLapsElement = document.getElementById('total-laps');
+        const carsDataElement = document.getElementById('cars-data');
+        const carMarkersElement = document.getElementById('car-markers');
+        
+        let startTime = Date.now();
+        let connected = false;
+        
+        // Connection opened
+        socket.addEventListener('open', (event) => {
+            statusElement.textContent = 'Connected';
+            statusElement.classList.remove('disconnected');
+            statusElement.classList.add('connected');
+            connected = true;
+            startTime = Date.now();
+        });
+
+        // Listen for messages
+        socket.addEventListener('message', (event) => {
+            try {
+                const raceState = JSON.parse(event.data);
+                updateRaceInfo(raceState);
+                updateCarsTable(raceState);
+                updateCarMarkers(raceState);
+            } catch (e) {
+                console.error('Error parsing race state:', e);
+            }
+        });
+
+        // Connection closed
+        socket.addEventListener('close', (event) => {
+            statusElement.textContent = 'Disconnected';
+            statusElement.classList.remove('connected');
+            statusElement.classList.add('disconnected');
+            connected = false;
+        });
+
+        // Connection error
+        socket.addEventListener('error', (event) => {
+            statusElement.textContent = 'Connection Error';
+            statusElement.classList.remove('connected');
+            statusElement.classList.add('disconnected');
+            connected = false;
+        });
+        
+        function updateRaceInfo(raceState) {
+            // This would come from the server or a specific request
+            if (!trackNameElement.textContent || trackNameElement.textContent === 'Loading...') {
+                trackNameElement.textContent = 'Unknown Track'; // This would need to be provided separately
+            }
+            
+            const timeElapsed = (Date.now() - startTime) / 1000;
+            timeElapsedElement.textContent = `${timeElapsed.toFixed(1)}s`;
+            
+            raceStatusElement.textContent = raceState.race_status;
+            currentLapElement.textContent = raceState.current_lap;
+            totalLapsElement.textContent = raceState.total_laps;
+        }
+        
+        function updateCarsTable(raceState) {
+            carsDataElement.innerHTML = '';
+            
+            raceState.cars.forEach((car, index) => {
+                const row = document.createElement('tr');
+                if (car.race_position <= 3) {
+                    row.classList.add('top-3');
+                }
+                
+                // Apply team color styling 
+                row.classList.add(`team-${car.team_number}`);
+                
+                const lapPercentage = (car.track_position % 1) * 100;
+                const currentLap = Math.floor(car.track_position);
+                
+                row.innerHTML = `
+                    <td>${car.race_position}</td>
+                    <td>${car.car_number}</td>
+                    <td>${car.driver}</td>
+                    <td>${car.team_name}</td>
+                    <td class="tire-${car.tire.type.toLowerCase()}">${car.tire.type}</td>
+                    <td>${car.tire.wear.toFixed(1)}</td>
+                    <td>${car.fuel.toFixed(1)}</td>
+                    <td>${currentLap}</td>
+                    <td>${lapPercentage.toFixed(1)}%</td>
+                    <td>${car.status}</td>
+                    <td>${car.driving_style}</td>
+                    <td>${car.speed.toFixed(1)}</td>
+                `;
+                
+                carsDataElement.appendChild(row);
+
+                    const svg = document.getElementById("bugatti-track");
+                    const path = document.getElementById("track");
+                
+                    const totalLength = path.getTotalLength();
+                    if (isFinite(totalLength)) {
+                        console.log("totalLength", totalLength, car.lap_percentage);
+                        const point = path.getPointAtLength(totalLength * (car.track_position % 1)); // 50% position
+                
+                        // Create the car as a circle if it doesn't exist
+                        if (!document.getElementById(`car_${car.car_number}`)) {
+                            const svgCar = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                            svgCar.setAttribute("id", `car_${car.car_number}`);
+                            svgCar.setAttribute("r", "10"); // radius
+                            svgCar.setAttribute("fill", teamColors[car.team_name]);
+                            svg.appendChild(svgCar);
+
+                            // Create the number text
+                            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                            label.textContent = car.car_number; // Car number
+                            label.setAttribute("id", `car_number_${car.car_number}`);
+                            label.setAttribute("text-anchor", "middle");
+                            label.setAttribute("dominant-baseline", "middle");
+                            label.setAttribute("fill", "black");
+                            label.setAttribute("font-size", "20px");
+                            label.setAttribute("font-weight", "bold");
+                            label.setAttribute("font-family", "Arial, sans-serif");
+                            svg.appendChild(label);
+                        }
+                        const svgCar = document.getElementById(`car_${car.car_number}`);
+                        svgCar.setAttribute("cx", point.x);
+                        svgCar.setAttribute("cy", point.y);
+                        const label = document.getElementById(`car_number_${car.car_number}`);
+                        label.setAttribute("x", point.x);
+                        label.setAttribute("y", point.y + 1.5); // Adjust vertically for visual centering
+                    }
+
+            });
+        }
+        
+        function updateCarMarkers(raceState) {
+            carMarkersElement.innerHTML = '';
+            
+            raceState.cars.forEach(car => {
+                const lapPercentage = (car.track_position % 1);
+                const marker = document.createElement('div');
+                marker.classList.add('car-marker', `team-${car.team_number}`);
+                marker.style.left = `${lapPercentage * 100}%`;
+                marker.textContent = car.car_number;
+                carMarkersElement.appendChild(marker);
+            });
+        }
+    </script>
+</body>
+</html> 
