@@ -1,8 +1,35 @@
-
 use crate::models::*;
 use crate::race_state::*;
 use std::sync::{Arc, Mutex};
 
+/// Command handling module for the race simulation
+///
+/// This module provides functionality for processing and executing commands that control
+/// the race simulation. Commands can modify race state, car behavior, and race flow.
+///
+/// # Command Types
+///
+/// - Race control commands: start, pause, stop
+/// - Car control commands: order [car_num] [style]
+/// - Pit stop commands: pit [car_num]
+/// - Status commands: status [car_num]
+///
+/// # Command Format
+///
+/// Commands are received as space-separated strings with the following format:
+/// `command [arguments...]`
+///
+/// # Examples
+///
+/// ```text
+/// start           // Start or resume the race
+/// pause           // Pause the race
+/// stop            // Stop/finish the race
+/// order 44 relax  // Set car 44's driving style to relax
+/// pit 77 soft refuel 50  // Order car 77 to pit, change to soft tires and refuel 50%
+/// ```
+///
+/// Commands return status messages indicating success or failure of the operation.
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
@@ -76,7 +103,7 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
                         "soft" => Some(TireType::Soft),
                         "medium" => Some(TireType::Medium),
                         "hard" => Some(TireType::Hard),
-                        "intermediate" => Some(TireType::Intermediate),
+                        "intermediate" | "inter" => Some(TireType::Intermediate),
                         "wet" => Some(TireType::Wet),
                         _ => None,
                     };
@@ -117,4 +144,3 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
     }
     result_messages.join("\\n")
 }
-

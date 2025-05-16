@@ -3,6 +3,30 @@ use std::collections::HashMap;
 
 use crate::models::*;
 
+/// Race state module for managing the race simulation
+///
+/// This module handles the core race simulation state and logic, including:
+/// - Track configuration and properties
+/// - Car and driver state management
+/// - Race progression and timing
+/// - Pit stops and tire management
+/// - Weather conditions and their effects
+/// - Race events and incidents
+///
+/// The race state is updated on each tick of the simulation loop and provides
+/// a client view for the UI and network interfaces.
+///
+/// Key features:
+/// - Real-time race position tracking
+/// - Tire wear and fuel consumption simulation
+/// - Driver skill and consistency effects
+/// - Weather impact on performance
+/// - Pit stop strategy handling
+/// - Race control and flagging system
+///
+/// The state can be modified through commands from the UI or network clients
+/// while maintaining consistency and race regulations.
+
 #[derive(Debug, Clone)]
 pub struct RaceState {
     pub track: Track,
@@ -18,18 +42,14 @@ impl RaceState {
         let mut rng = rand::thread_rng();
 
         let team_names = ["Red Bull", "Ferrari", "Mercedes", "McLaren", "Alpine"];
-        let driver_names = [
-            "Max Verstappen",
-            "Yuki Tsunoda", // Red Bull
-            "Charles Leclerc",
-            "Lewis Hamilton", // Ferrari
-            "George Russell",
-            "Kimi Antonelli", // Mercedes
-            "Lando Norris",
-            "Oscar Piastri", // McLaren
-            "Pierre Gasly",
-            "Isack Hadjar", // Alpine
-        ];
+        let drivers = load_drivers_from_json("./drivers.json");
+        if drivers.len() < team_names.len() * 2 {
+            panic!(
+                "Not enough drivers in the JSON file to fill the teams ({} < {}*2)",
+                drivers.len(),
+                team_names.len()
+            );
+        }
 
         for i in 0..5 {
             let team_number = (i + 1) as u32;
@@ -45,16 +65,15 @@ impl RaceState {
             for j in 0..2 {
                 let car_index = i * 2 + j;
                 let car_number = (car_index + 1) as u32;
-                let driver_name = driver_names[car_index as usize].to_string();
+
+                // Use Driver::new to create the driver
+                let driver = drivers[car_index as usize].clone();
 
                 let car = Car {
                     number: car_number,
                     team_number,
-                    team_name: team_name_str.clone(), // Store team_name directly in Car for easier access
-                    driver: Driver {
-                        name: driver_name,
-                        skill_level: rng.gen_range(0.5..1.0),
-                    },
+                    team_name: team_name_str.clone(),
+                    driver,
                     tire: Tire {
                         type_: TireType::Medium,
                         wear: 0.0,
@@ -272,8 +291,6 @@ impl RaceState {
     }
 }
 
-
-
 fn compare_cars(a: &Car, b: &Car) -> std::cmp::Ordering {
     match (a.status, b.status) {
         // Both finished - sort by finished time ascending
@@ -343,4 +360,17 @@ fn update_race_finished(state: &mut RaceState) {
             state.run_state = RaceRunState::LastLap;
         }
     }
+}
+
+fn load_drivers_from_json(file_path: &str) -> Vec<Driver> {
+    let drivers_json = std::fs::read_to_string(file_path).expect("Failed to read drivers.json");
+    let drivers_data: serde_json::Value =
+        serde_json::from_str(&drivers_json).expect("Failed to parse drivers.json");
+    let drivers = drivers_data
+        .as_array()
+        .expect("Expected drivers to be an array");
+    drivers
+        .iter()
+        .map(|v| Driver::new(&serde_json::to_string(v).unwrap()))
+        .collect::<Vec<_>>()
 }

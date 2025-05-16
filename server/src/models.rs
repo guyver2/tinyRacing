@@ -1,5 +1,4 @@
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TireType {
@@ -34,7 +33,40 @@ pub struct Tire {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Driver {
     pub name: String,
-    pub skill_level: f32, // 0.5 to 1.0
+    // all skills are 0.0 to 1.0
+    pub skill_level: f32,       // how good the driver is at the car
+    pub stamina: f32, // how well the driver can handle the physical demands of the car, stamina decreases with race time
+    pub weather_tolerance: f32, // how well the driver can handle the wet weather
+    pub experience: f32, // how experienced the driver is, more experience means less mistakes
+    pub consistency: f32, // how consistent the driver is, less variance in performance
+    pub focus: f32,   // how focused the driver is, how much they are susceptible to be in the zone
+}
+
+impl Driver {
+    pub fn new(json: &str) -> Self {
+        let driver: Driver = serde_json::from_str(json).unwrap();
+        driver
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarStats {
+    // all skills are 0.0 to 1.0
+    pub handling: f32,         // how well the car manage turns
+    pub acceleration: f32,     // how well the car can accelerate
+    pub top_speed: f32,        // how fast the car can go
+    pub reliability: f32,      // how reliable the car is, reliability decreases with race time
+    pub fuel_consumption: f32, // how much fuel the car consumes
+    pub tire_wear: f32,        // how much tire wear the car gets
+    pub pit_stop_time: f32,    // how long the pit stop takes
+    pub pit_stop_fuel: f32,    // how much fuel the car consumes during a pit stop
+    pub pit_stop_tire: f32,    // how much tire wear the car gets during a pit stop
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TeamStats {
+    pub pit_stop_time_fuel: f32, // how much time it takes to refuel the car
+    pub pit_stop_time_tire: f32, // how much time it takes to change the tires
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -82,8 +114,6 @@ pub enum RaceRunState {
     LastLap,
     Finished,
 }
-
-
 
 #[derive(Serialize, Debug, Clone)] // Only Serialize for sending to clients
 pub struct CarClientData {
