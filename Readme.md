@@ -1,4 +1,4 @@
-# F1 Race Simulator
+# Tiny Racing
 
 A text-based Formula 1 race simulation game written in Rust.
 
@@ -21,11 +21,14 @@ A text-based Formula 1 race simulation game written in Rust.
 ### Installation
 
 1. Clone the repository
-2. Run `cargo build --release`
+2. Build the simulation app. `cd server && cargo build --release`
+3. Install the web client dependencies. `cd tiny-racing-vue && npm install`
 
 ### Running
 
-1. Run the simulation locally `cd server && cargo run -- track.json`
+1. Run the simulation locally. `cd server && cargo run -- track.json`
+2. (optional) Run the simple http server for json and svg assets. `python tiny-racing-vue/server.py`
+3. (optional) Run the Vue.js web client. `cd tiny-racing-vue && npm run dev`
 
 
 ### Screenshots
