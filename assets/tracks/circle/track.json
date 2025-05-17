@@ -1,0 +1,8 @@
+{
+    "id": "circle",
+    "name": "Circle Track",
+    "description": "A simple circle track with a radius of 100 meters.",
+    "laps": 10,
+    "lap_length_km": 1.0,
+    "svg_start_offset": 0
+}

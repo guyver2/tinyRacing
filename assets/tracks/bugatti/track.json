@@ -1,0 +1,8 @@
+{
+    "id": "bugatti",
+    "name": "Bugatti Circuit",
+    "description": "The Bugatti Circuit is a 4.14 km permanent race track located in Le Mans, France known for its technical corners and long straights.",
+    "laps": 5,
+    "lap_length_km": 4.14,
+    "svg_start_offset": 0.0
+}

@@ -1,0 +1,8 @@
+{
+    "id": "le_mans",
+    "name": "Le Mans Circuit",
+    "description": "The Le Mans Circuit is a 13.629 km long circuit that is part of the 24 Hours of Le Mans race. It is a 10-turn circuit that is known for its high speeds and technical challenges.",
+    "laps": 2,
+    "lap_length_km": 13.629,
+    "svg_start_offset": 0.88
+}

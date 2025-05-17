@@ -1,3 +1,6 @@
+use std::fs;
+use std::io;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -102,9 +105,19 @@ pub struct Team {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Track {
+    pub id: String,
     pub name: String,
     pub laps: u32,
     pub lap_length_km: f32,
+}
+
+impl Track {
+    pub fn load_track_config(path: &str) -> Result<Track, io::Error> {
+        let data = fs::read_to_string(path)?;
+        let track: Track = serde_json::from_str(&data)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        Ok(track)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -140,6 +153,7 @@ pub struct ClientTireData {
 
 #[derive(Serialize, Debug, Clone)] // Only Serialize for sending to clients
 pub struct RaceStateClientView {
+    pub track: Track,
     pub cars: Vec<CarClientData>,
     pub current_lap: u32, // Max lap across all cars? Or based on leader?
     pub total_laps: u32,

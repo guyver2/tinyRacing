@@ -1,8 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 
-use std::fs;
-use std::io;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration};
@@ -24,13 +22,6 @@ use crate::commands::*;
 
 mod ncurses_ui;
 use crate::ncurses_ui::*;
-
-fn load_track_config(path: &str) -> Result<Track, io::Error> {
-    let data = fs::read_to_string(path)?;
-    let track: Track =
-        serde_json::from_str(&data).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    Ok(track)
-}
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
@@ -154,7 +145,7 @@ async fn main() {
         eprintln!("Usage: {} <track_config.json>", args[0]);
         std::process::exit(1);
     }
-    match load_track_config(&args[1]) {
+    match Track::load_track_config(&args[1]) {
         Ok(track_config) => {
             let initial_state = RaceState::new(track_config.clone());
             let shared_state = Arc::new(Mutex::new(initial_state));
@@ -181,7 +172,10 @@ async fn main() {
 
             ui_log_tx.send("UI thread started.".to_string()).ok();
             ui_log_tx
-                .send(format!("Track loaded: {}", track_config.name))
+                .send(format!(
+                    "Track loaded: {}:{}",
+                    track_config.id, track_config.name
+                ))
                 .ok();
 
             // --- Spawn Game Loop Task ---

@@ -42,7 +42,7 @@ impl RaceState {
         let mut rng = rand::thread_rng();
 
         let team_names = ["Red Bull", "Ferrari", "Mercedes", "McLaren", "Alpine"];
-        let drivers = load_drivers_from_json("./drivers.json");
+        let drivers = load_drivers_from_json("./assets/drivers.json");
         if drivers.len() < team_names.len() * 2 {
             panic!(
                 "Not enough drivers in the JSON file to fill the teams ({} < {}*2)",
@@ -137,6 +137,7 @@ impl RaceState {
         car_data.sort_by_key(|c| c.race_position);
 
         RaceStateClientView {
+            track: self.track.clone(),
             cars: car_data,
             current_lap: self.cars.values().map(|c| c.lap).max().unwrap_or(0), // Leader's lap
             total_laps: self.track.laps,
