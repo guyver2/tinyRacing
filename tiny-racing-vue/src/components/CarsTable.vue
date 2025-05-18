@@ -3,7 +3,7 @@
     <table class="cars-table" :class="{ 'collapsed': collapsed }">
       <thead>
         <tr>
-          <th>Pos</th>
+          <th v-if="!collapsed">Pos</th>
           <th>Car#</th>
           <th>Driver</th>
           <th v-if="!collapsed">Team</th>
@@ -21,12 +21,18 @@
         <tr v-if="cars.length === 0">
           <td :colspan="collapsed ? 3 : 12" style="text-align: center;">Waiting for race data...</td>
         </tr>
-        <tr v-for="car in cars" :key="car.car_number" :class="getRowClasses(car)">
-          <td>{{ car.race_position }}</td>
-          <td>{{ car.car_number }}</td>
-          <td>{{ car.driver }}</td>
+        <tr 
+          v-for="car in cars" 
+          :key="car.car_number" 
+          :class="getRowClasses(car)"
+          @click="selectCar(car)"
+          style="cursor: pointer;"
+        >
+          <td v-if="!collapsed" :class="{ 'top-3': car.race_position <= 3 }">{{ car.race_position }}</td>
+          <td :class="{ 'top-3': car.race_position <= 3 }">{{ car.car_number }}</td>
+          <td :class="{ 'top-3': car.race_position <= 3 }">{{ car.driver }}</td>
           <td v-if="!collapsed">{{ car.team_name }}</td>
-          <td v-if="!collapsed" :class="`tire-${car.tire.type.toLowerCase()}`">{{ car.tire.type }}</td>
+          <td v-if="!collapsed"><img :src="`${ROOT_URL}/assets/tires/${car.tire.type.toLowerCase()}.svg`" :alt="`${car.tire.type}`" :title="`${car.tire.type}`" class="tire-icon"></td>
           <td v-if="!collapsed">{{ car.tire.wear.toFixed(1) }}</td>
           <td v-if="!collapsed">{{ car.fuel.toFixed(1) }}</td>
           <td v-if="!collapsed">{{ Math.floor(car.track_position) }}</td>
@@ -42,11 +48,22 @@
         {{ collapsed ? '>>' : '<<' }}
       </div>
     </div>
+    
+    <DriverStrategyForm 
+      v-if="selectedCar" 
+      :car="selectedCar" 
+      :visible="!!selectedCar"
+      @close="closeStrategyForm"
+      @update-strategy="updateStrategy"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import type { Car } from '@/types';
+import { ROOT_URL } from '@/constants';
+import DriverStrategyForm from './DriverStrategyForm.vue';
 
 const props = defineProps<{
   cars: Car[];
@@ -55,7 +72,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:collapsed': [value: boolean];
+  'update-car-strategy': [strategy: { carNumber: number, style: string, tire?: string, refuel?: number }];
 }>();
+
+const selectedCar = ref<Car | null>(null);
 
 function getRowClasses(car: Car) {
   const classes = [`team-${car.team_number}`];
@@ -67,6 +87,20 @@ function getRowClasses(car: Car) {
 
 function toggleCollapsed() {
   emit('update:collapsed', !props.collapsed);
+}
+
+function selectCar(car: Car) {
+  selectedCar.value = car;
+}
+
+function closeStrategyForm() {
+  selectedCar.value = null;
+}
+
+function updateStrategy(strategy: { carNumber: number, style: string, tire?: string, refuel?: number }) {
+  emit('update-car-strategy', strategy);
+  // Optionally close the form after updating strategy
+  // selectedCar.value = null;
 }
 </script>
 
@@ -132,5 +166,14 @@ function toggleCollapsed() {
 
 .top-3 {
   font-weight: bold;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.tire-icon {
+  width: 24px;
+  height: 24px;
 }
 </style> 

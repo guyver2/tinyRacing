@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import type { Car, Track } from '@/types';
+import { ROOT_URL } from '@/constants';
 
 interface TrackData {
   id: string;
@@ -33,7 +34,7 @@ async function loadTrack() {
   
   try {
     // Load SVG
-    const svgResponse = await fetch(`http://localhost:8000/assets/tracks/${props.trackId}/track.svg`);
+    const svgResponse = await fetch(`${ROOT_URL}/assets/tracks/${props.trackId}/track.svg`);
     const svgData = await svgResponse.text();
     if (trackContainer.value) {
       trackContainer.value.innerHTML = svgData;
@@ -68,7 +69,7 @@ async function loadTrack() {
     }
     
     // Load track data
-    const dataResponse = await fetch(`http://localhost:8000/assets/tracks/${props.trackId}/track.json`);
+    const dataResponse = await fetch(`${ROOT_URL}/assets/tracks/${props.trackId}/track.json`);
     trackData.value = await dataResponse.json();
   } catch (error) {
     console.error('Error loading track:', error);
