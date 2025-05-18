@@ -97,50 +97,97 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
             }
         }
         ["pit", car_num_str, tire_str, "refuel", fuel_str] => {
-            if let Ok(car_num) = car_num_str.parse::<u32>() {
-                if let Some(car) = state_guard.cars.get_mut(&car_num) {
-                    let target_tire = match tire_str.to_lowercase().as_str() {
-                        "soft" => Some(TireType::Soft),
-                        "medium" => Some(TireType::Medium),
-                        "hard" => Some(TireType::Hard),
-                        "intermediate" | "inter" => Some(TireType::Intermediate),
-                        "wet" => Some(TireType::Wet),
-                        _ => None,
-                    };
-                    let target_fuel = fuel_str.parse::<f32>().ok();
-
-                    if target_tire.is_none() {
-                        result_messages.push(format!("Invalid target tire type: {}", tire_str));
-                        return result_messages.join("\\n");
-                    }
-                    if target_fuel.is_none()
-                        || target_fuel.unwrap() < 0.0
-                        || target_fuel.unwrap() > 100.0
-                    {
-                        result_messages.push(format!(
-                            "Invalid target fuel level: {}. Must be 0-100.",
-                            fuel_str
-                        ));
-                        return result_messages.join("\\n");
-                    }
-
-                    car.pit_request = true;
-                    car.target_tire = target_tire;
-                    car.target_fuel = target_fuel;
-                    result_messages.push(format!(
-                        "Car {} queued for pit stop: Tire -> {:?}, Fuel -> {:?}%",
-                        car_num,
-                        car.target_tire.as_ref().unwrap(),
-                        car.target_fuel.unwrap()
-                    ));
-                } else {
-                    result_messages.push(format!("Car number {} not found.", car_num));
-                }
-            } else {
-                result_messages.push(format!("Invalid car number: {}", car_num_str));
-            }
+            handle_pit_command(car_num_str, Some(tire_str), Some(fuel_str), &mut state_guard, &mut result_messages);
+        }
+        ["pit", car_num_str, "refuel", fuel_str, tire_str] => {
+            handle_pit_command(car_num_str, Some(tire_str), Some(fuel_str), &mut state_guard, &mut result_messages);
+        }
+        ["pit", car_num_str, tire_str] => {
+            handle_pit_command(car_num_str, Some(tire_str), None, &mut state_guard, &mut result_messages);
+        }
+        ["pit", car_num_str, "refuel", fuel_str] => {
+            handle_pit_command(car_num_str, None, Some(fuel_str), &mut state_guard, &mut result_messages);
+        }
+        ["pit", _car_num_str] => {
+            result_messages.push(format!("Invalid pit command. Use: pit <car_number> [soft/medium/hard/intermediate/wet] [refuel <0-100>]"));
         }
         _ => result_messages.push(format!("Unknown command: {}", command_str.trim())),
     }
     result_messages.join("\\n")
+}
+
+fn handle_pit_command(
+    car_num_str: &str, 
+    tire_str_opt: Option<&str>, 
+    fuel_str_opt: Option<&str>,
+    state_guard: &mut RaceState,
+    result_messages: &mut Vec<String>
+) {
+    if let Ok(car_num) = car_num_str.parse::<u32>() {
+        if let Some(car) = state_guard.cars.get_mut(&car_num) {
+            // Process tire type if provided
+            let target_tire = if let Some(tire_str) = tire_str_opt {
+                match tire_str.to_lowercase().as_str() {
+                    "soft" => Some(TireType::Soft),
+                    "medium" => Some(TireType::Medium),
+                    "hard" => Some(TireType::Hard),
+                    "intermediate" | "inter" => Some(TireType::Intermediate),
+                    "wet" => Some(TireType::Wet),
+                    _ => {
+                        result_messages.push(format!("Invalid target tire type: {}", tire_str));
+                        return;
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Process fuel level if provided
+            let target_fuel = if let Some(fuel_str) = fuel_str_opt {
+                match fuel_str.parse::<f32>() {
+                    Ok(fuel) if fuel >= 0.0 && fuel <= 100.0 => Some(fuel),
+                    _ => {
+                        result_messages.push(format!(
+                            "Invalid target fuel level: {}. Must be 0-100.",
+                            fuel_str
+                        ));
+                        return;
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Make sure at least one operation is being performed
+            if target_tire.is_none() && target_fuel.is_none() {
+                result_messages.push("Pit stop request must specify at least tire change or refuel operation.".to_string());
+                return;
+            }
+
+            // Set pit request
+            car.pit_request = true;
+            car.target_tire = target_tire;
+            car.target_fuel = target_fuel;
+
+            // Format appropriate message based on operations
+            let tire_msg = match &car.target_tire {
+                Some(tire) => format!("Tire -> {:?}", tire),
+                None => "No tire change".to_string(),
+            };
+
+            let fuel_msg = match car.target_fuel {
+                Some(fuel) => format!("Fuel -> {}%", fuel),
+                None => "No refuel".to_string(),
+            };
+
+            result_messages.push(format!(
+                "Car {} queued for pit stop: {}, {}",
+                car_num, tire_msg, fuel_msg
+            ));
+        } else {
+            result_messages.push(format!("Car number {} not found.", car_num));
+        }
+    } else {
+        result_messages.push(format!("Invalid car number: {}", car_num_str));
+    }
 }
