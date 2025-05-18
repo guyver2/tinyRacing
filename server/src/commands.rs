@@ -97,16 +97,40 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
             }
         }
         ["pit", car_num_str, tire_str, "refuel", fuel_str] => {
-            handle_pit_command(car_num_str, Some(tire_str), Some(fuel_str), &mut state_guard, &mut result_messages);
+            handle_pit_command(
+                car_num_str,
+                Some(tire_str),
+                Some(fuel_str),
+                &mut state_guard,
+                &mut result_messages,
+            );
         }
         ["pit", car_num_str, "refuel", fuel_str, tire_str] => {
-            handle_pit_command(car_num_str, Some(tire_str), Some(fuel_str), &mut state_guard, &mut result_messages);
+            handle_pit_command(
+                car_num_str,
+                Some(tire_str),
+                Some(fuel_str),
+                &mut state_guard,
+                &mut result_messages,
+            );
         }
         ["pit", car_num_str, tire_str] => {
-            handle_pit_command(car_num_str, Some(tire_str), None, &mut state_guard, &mut result_messages);
+            handle_pit_command(
+                car_num_str,
+                Some(tire_str),
+                None,
+                &mut state_guard,
+                &mut result_messages,
+            );
         }
         ["pit", car_num_str, "refuel", fuel_str] => {
-            handle_pit_command(car_num_str, None, Some(fuel_str), &mut state_guard, &mut result_messages);
+            handle_pit_command(
+                car_num_str,
+                None,
+                Some(fuel_str),
+                &mut state_guard,
+                &mut result_messages,
+            );
         }
         ["pit", _car_num_str] => {
             result_messages.push(format!("Invalid pit command. Use: pit <car_number> [soft/medium/hard/intermediate/wet] [refuel <0-100>]"));
@@ -117,11 +141,11 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
 }
 
 fn handle_pit_command(
-    car_num_str: &str, 
-    tire_str_opt: Option<&str>, 
+    car_num_str: &str,
+    tire_str_opt: Option<&str>,
     fuel_str_opt: Option<&str>,
     state_guard: &mut RaceState,
-    result_messages: &mut Vec<String>
+    result_messages: &mut Vec<String>,
 ) {
     if let Ok(car_num) = car_num_str.parse::<u32>() {
         if let Some(car) = state_guard.cars.get_mut(&car_num) {
@@ -160,7 +184,10 @@ fn handle_pit_command(
 
             // Make sure at least one operation is being performed
             if target_tire.is_none() && target_fuel.is_none() {
-                result_messages.push("Pit stop request must specify at least tire change or refuel operation.".to_string());
+                result_messages.push(
+                    "Pit stop request must specify at least tire change or refuel operation."
+                        .to_string(),
+                );
                 return;
             }
 

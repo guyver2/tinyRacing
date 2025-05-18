@@ -23,6 +23,8 @@ use crate::commands::*;
 mod ncurses_ui;
 use crate::ncurses_ui::*;
 
+mod api;
+
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
 
@@ -140,11 +142,15 @@ fn broadcast_state(state: SharedRaceState, clients: Clients) {
 
 #[tokio::main]
 async fn main() {
+    // Initialize tracing for logging
+    tracing_subscriber::fmt::init();
+
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
         eprintln!("Usage: {} <track_config.json>", args[0]);
         std::process::exit(1);
     }
+
     match Track::load_track_config(&args[1]) {
         Ok(track_config) => {
             let initial_state = RaceState::new(track_config.clone());
@@ -155,6 +161,19 @@ async fn main() {
             let (view_tx, view_rx) = std_mpsc::channel::<RaceStateClientView>();
             let (cmd_tx, cmd_rx_ui) = std_mpsc::channel::<String>(); // Renamed for clarity in UI thread
             let (log_tx, log_rx) = std_mpsc::channel::<String>();
+
+            // Clone the race state for the API server
+            let api_race_state = shared_state.clone();
+
+            // Start the API server in a separate task
+            tokio::spawn(async move {
+                let app = api::create_api_router(api_race_state);
+
+                let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+                tracing::info!("API server listening on http://localhost:3000");
+
+                axum::serve(listener, app).await.unwrap();
+            });
 
             // --- Spawn UI Thread ---
             let ui_log_tx = log_tx.clone(); // Clone for initial messages
@@ -176,6 +195,11 @@ async fn main() {
                     "Track loaded: {}:{}",
                     track_config.id, track_config.name
                 ))
+                .ok();
+
+            // Log that the API is available
+            ui_log_tx
+                .send("REST API server available at http://localhost:3000".to_string())
                 .ok();
 
             // --- Spawn Game Loop Task ---
@@ -259,7 +283,6 @@ async fn main() {
                                 .ok();
                             async move {
                                 handle_websocket_connection(socket, ws_clients, ws_state).await;
-                                // client_log_tx.send("WebSocket client disconnected.".to_string()).ok(); // Already handled in handle_websocket
                             }
                         })
                     },
@@ -284,36 +307,15 @@ async fn main() {
                 warp::serve(routes).run(addr).await;
             });
 
-            // Keep the main function alive by awaiting something or looping if necessary
-            // Since UI is in a separate thread and tokio tasks are spawned,
-            // the main tokio runtime will stay alive as long as there are tasks.
-            // If all tokio tasks complete and UI thread is still running, main might exit.
-            // The warp server will keep its task alive.
-            // For robustness, we can wait for a shutdown signal if implemented.
-            // For now, the server_task.await (if it were awaited directly here) or just letting tokio run is okay.
-            // The current structure with tokio::spawn for the server means main might finish if all other tasks finish.
-            // Let's add a small loop to keep main alive, or await a signal.
-            // For now, let the tokio runtime manage its lifetime based on spawned tasks.
-            // If the UI thread is the primary interface, its termination could signal shutdown for others.
-
             // Example: Wait for a shutdown signal (not fully implemented here)
             let (_shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-            // In ui_thread_main, on "quit", you could try to send to shutdown_tx.
 
             // This keeps the main alive until a shutdown signal is received or tasks end.
-            // If the UI thread is the main controller, its exit should ideally trigger others.
-            // For now, tokio will run as long as the warp server task is alive.
-            let _ = shutdown_rx.await; // This will wait indefinitely if shutdown_tx is never used.
-                                       // Or simply let main finish, tokio tasks will run.
-                                       // For a cleaner shutdown, the UI thread would need to signal other tasks.
+            let _ = shutdown_rx.await;
         }
         Err(e) => {
-            // If ncurses is not initialized, println is fine.
-            // If it might be, this error might not be visible.
             eprintln!("Failed to load track configuration: {}", e);
-            // Consider logging to a file as a fallback if UI fails early.
             return;
         }
     }
 }
-// ... (rest of the comments are fine)

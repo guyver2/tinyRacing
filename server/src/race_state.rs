@@ -39,7 +39,7 @@ impl RaceState {
     pub fn new(track: Track) -> Self {
         let mut cars = HashMap::new();
         let mut teams = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let team_names = ["Red Bull", "Ferrari", "Mercedes", "McLaren", "Alpine"];
         let drivers = load_drivers_from_json("./assets/drivers.json");
@@ -87,7 +87,7 @@ impl RaceState {
                     total_distance: 0.0,
                     finished_time: 0,
                     speed: 0.0,
-                    base_performance: rng.gen_range(0.9..1.1),
+                    base_performance: rng.random_range(0.9..1.1),
                     pit_request: false,
                     target_tire: None,
                     target_fuel: None,
