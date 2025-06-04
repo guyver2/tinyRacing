@@ -4,5 +4,5 @@
     "description": "The Monaco Grand Prix is a 3.34 km permanent race track located in Monte Carlo, Monaco known for its narrow streets and high speeds.",
     "laps": 78,
     "lap_length_km": 3.34,
-    "svg_start_offset": 0.06
+    "svg_start_offset": 0.0
 }

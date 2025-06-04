@@ -1,0 +1,8 @@
+{
+    "id": "bahrain",
+    "name": "Bahrain International Circuit",
+    "description": "The Bahrain International Circuit is a 5.41 km permanent race track located in Bahrain known for its long straights and high-speed corners.",
+    "laps": 5,
+    "lap_length_km": 5.41,
+    "svg_start_offset": 0.0
+}

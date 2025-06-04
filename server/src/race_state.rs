@@ -185,45 +185,59 @@ impl RaceState {
             }
 
             // --- Calculate Performance Factors (Only if Racing) ---
+            let mut max_speed = car.max_speed();
             // Base performance
-            let mut performance_multiplier = car.base_performance;
+            //let mut performance_multiplier = car.base_performance;
 
             // Driver skill
-            performance_multiplier *= car.driver.skill_level;
+            //performance_multiplier *= car.driver.skill_level;
 
             // Driving style
-            match car.driving_style {
-                DrivingStyle::Aggressive => performance_multiplier *= 1.05,
-                DrivingStyle::Relax => performance_multiplier *= 0.95,
-                DrivingStyle::Normal => (), // No change
-            }
+            //match car.driving_style {
+            //    DrivingStyle::Aggressive => performance_multiplier *= 1.05,
+            //    DrivingStyle::Relax => performance_multiplier *= 0.95,
+            //    DrivingStyle::Normal => (), // No change
+            //}
 
             // Tire grip/wear (simple model: linear drop-off)
             // TODO: More sophisticated tire model based on type
-            let grip_factor = 1.0 - (car.tire.wear / 150.0); // Example: Grip drops linearly, fully gone at 150% wear
-            performance_multiplier *= grip_factor.max(0.1); // Ensure minimum grip
+            //let grip_factor = 1.0 - (car.tire.wear / 150.0); // Example: Grip drops linearly, fully gone at 150% wear
+            //performance_multiplier *= grip_factor.max(0.1); // Ensure minimum grip
 
             // Fuel weight (simple model: linear effect)
-            let fuel_weight_penalty = car.fuel / 2000.0; // Example: 0.05 penalty at 100% fuel
-            performance_multiplier *= 1.0 - fuel_weight_penalty;
+            //let fuel_weight_penalty = car.fuel / 2000.0; // Example: 0.05 penalty at 100% fuel
+            //performance_multiplier *= 1.0 - fuel_weight_penalty;
+
+            // slow down on corners
+            let track_point = self.track.get_track_point_at_distance(car.lap_percentage);
+            let curvature = track_point.curvature;
+            // curvature goes from 0 to ~0.3 (angle in radians).
+            // we want to map 0.3 and above to a speed decrease of 75%, 0.0 is a speed decrease of 0%, between is exponential
+            let curvature_factor = (-4.62 * curvature).exp().max(0.15);
+            if car.number == 1 {
+                //println!("at lap_percentage: {}, curvature: {}, curvature_factor: {}", car.lap_percentage, curvature, curvature_factor);
+            }
+            max_speed *= curvature_factor;
+
+            // ramp up to max speed
+            car.speed = max_speed.min(car.speed + car.acceleration());
 
             // Random events (placeholder)
             // TODO: Implement failure risk, especially for aggressive style
 
             // --- Update State (Only if Racing) ---
             // Calculate distance covered this tick (adjust speed based on time_scale)
-            let base_speed_kph = 200.0; // Base speed in km/h
+            //let base_speed_kph = 200.0; // Base speed in km/h
             let tick_duration_seconds = 0.1; // 100ms
-            let distance_km =
-                (base_speed_kph * performance_multiplier / 3600.0) * tick_duration_seconds;
+            let distance_km = (car.speed / 3600.0) * tick_duration_seconds;
 
             let distance_laps = distance_km / self.track.lap_length_km;
             car.lap_percentage += distance_laps;
 
             // Calculate live speed in km/h (converting from distance per tick to km/h)
-            car.speed = (base_speed_kph * performance_multiplier)
-                * grip_factor
-                * (1.0 - fuel_weight_penalty);
+            // car.speed = (base_speed_kph * performance_multiplier)
+            //     * grip_factor
+            //     * (1.0 - fuel_weight_penalty);
 
             // Handle lap completion
             while car.lap_percentage >= 1.0 {
@@ -246,7 +260,7 @@ impl RaceState {
             }
 
             // Update fuel consumption (example rate)
-            let fuel_consumption_rate = 0.1 * performance_multiplier; // Higher performance uses more fuel
+            let fuel_consumption_rate = 0.001 * car.max_speed(); // Higher performance uses more fuel
             car.fuel -= fuel_consumption_rate * tick_duration_seconds as f32;
             car.fuel = car.fuel.max(0.0);
             if car.fuel == 0.0 && car.status == CarStatus::Racing {
@@ -256,8 +270,8 @@ impl RaceState {
             }
 
             // Update tire wear (example rate)
-            let tire_wear_rate = 0.05 * performance_multiplier; // Higher performance wears tires faster
-                                                                // TODO: Different wear rates for different tire types
+            let tire_wear_rate = 0.0005 * car.max_speed(); // Higher performance wears tires faster
+                                                           // TODO: Different wear rates for different tire types
             car.tire.wear += tire_wear_rate * tick_duration_seconds as f32;
             car.tire.wear = car.tire.wear.min(100.0); // Cap at 100%?
                                                       // TODO: Consider tire failure above certain wear

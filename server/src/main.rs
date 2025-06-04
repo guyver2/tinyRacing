@@ -147,11 +147,11 @@ async fn main() {
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
-        eprintln!("Usage: {} <track_config.json>", args[0]);
+        eprintln!("Usage: {} [track folder]", args[0]);
         std::process::exit(1);
     }
 
-    match Track::load_track_config(&args[1]) {
+    match Track::load_track_config(args[1].as_str()) {
         Ok(track_config) => {
             let initial_state = RaceState::new(track_config.clone());
             let shared_state = Arc::new(Mutex::new(initial_state));

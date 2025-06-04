@@ -114,6 +114,7 @@ function updateCarPositions() {
         svgCar.setAttribute('id', `car_${car.car_number}`);
         svgCar.setAttribute('r', '10');
         svgCar.setAttribute('fill', teamColors[car.team_name as keyof typeof teamColors] || '#aaaaaa');
+        svgCar.setAttribute('style', 'transition: cx 0.5s ease-out, cy 0.5s ease-out;');
         svg.appendChild(svgCar);
         
         // Create car number text
@@ -126,6 +127,9 @@ function updateCarPositions() {
         label.setAttribute('font-size', '20px');
         label.setAttribute('font-weight', 'bold');
         label.setAttribute('font-family', 'Arial, sans-serif');
+        label.setAttribute('x', '0');
+        label.setAttribute('y', '0');
+        label.setAttribute('style', 'transition: transform 0.5s ease-out;');
         svg.appendChild(label);
       }
       
@@ -134,8 +138,13 @@ function updateCarPositions() {
       
       const label = document.getElementById(`car_number_${car.car_number}`);
       if (label) {
-        label.setAttribute('x', transformedPoint.x.toString());
-        label.setAttribute('y', (transformedPoint.y + 1.5).toString());
+        // Ensure the label has the proper transition style applied
+        const currentStyle = label.getAttribute('style') || '';
+        if (!currentStyle.includes('transition')) {
+          label.setAttribute('style', (currentStyle + '; transition: transform 0.5s ease-out;').replace(/^;/, ''));
+        }
+        // Use transform instead of x/y attributes for smoother transitions
+        label.setAttribute('transform', `translate(${transformedPoint.x}, ${transformedPoint.y + 1.5})`);
       }
     }
   });
@@ -199,5 +208,13 @@ watch(() => props.cars, updateCarPositions, { deep: true });
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+:deep(circle[id^="car_"]) {
+  transition: cx 0.5s ease-out, cy 0.5s ease-out;
+}
+
+:deep(text[id^="car_number_"]) {
+  transition: transform 0.5s ease-out;
 }
 </style> 
