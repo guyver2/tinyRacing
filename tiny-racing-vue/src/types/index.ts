@@ -21,6 +21,9 @@ export interface Track {
   id: string;
   name: string;
   svg_start_offset: number;
+  current_weather: string;
+  wetness: number;
+  elapsed_time: number;
 }
 
 export interface RaceState {

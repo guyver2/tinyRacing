@@ -1,0 +1,8 @@
+{
+    "id": "test",
+    "name": "Test Track",
+    "description": "A test track for testing the car physics and AI.",
+    "laps": 100,
+    "lap_length_km": 2.5,
+    "svg_start_offset": 0.0
+}

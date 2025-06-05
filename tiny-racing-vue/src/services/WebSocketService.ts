@@ -6,7 +6,10 @@ const defaultRaceState: RaceState = {
   track: {
     id: '',
     name: 'Loading...',
-    svg_start_offset: 0
+    svg_start_offset: 0,
+    current_weather: 'clear',
+    wetness: 0.0,
+    elapsed_time: 0.0
   },
   cars: [],
   race_status: 'Loading...',
@@ -75,7 +78,6 @@ export const useRaceData = () => {
   return {
     raceState,
     connected: connectedState,
-    timeElapsed,
     updateCarStrategy
   };
 }; 

@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Cloud -->
+    <path d="M44 36H20a10 10 0 0 1 0-20 12 12 0 0 1 24 0 8 8 0 0 1 0 16h-4" 
+          fill="#90A4AE"/>
+  
+    <!-- Raindrops -->
+    <line x1="24" y1="44" x2="24" y2="52" stroke="#2196F3" stroke-width="3" stroke-linecap="round"/>
+    <line x1="32" y1="46" x2="32" y2="54" stroke="#2196F3" stroke-width="3" stroke-linecap="round"/>
+    <line x1="40" y1="44" x2="40" y2="52" stroke="#2196F3" stroke-width="3" stroke-linecap="round"/>
+  </svg>
+  

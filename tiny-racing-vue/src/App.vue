@@ -7,7 +7,7 @@ import TrackSvg from './components/TrackSvg.vue';
 import ConnectionStatus from './components/ConnectionStatus.vue';
 import { useRaceData } from './services/WebSocketService';
 
-const { raceState, connected, timeElapsed, updateCarStrategy } = useRaceData();
+const { raceState, connected, updateCarStrategy } = useRaceData();
 const isCarTableCollapsed = ref(true);
 
 function handleCarStrategyUpdate(strategy: { carNumber: number, style: string, tire?: string, refuel?: number }) {
@@ -21,10 +21,12 @@ function handleCarStrategyUpdate(strategy: { carNumber: number, style: string, t
       <div class="header-content">
         <RaceHeader 
           :trackName="raceState.track.name"
-          :timeElapsed="timeElapsed"
+          :elapsedTime="raceState.track.elapsed_time"
           :raceStatus="raceState.race_status"
           :currentLap="raceState.current_lap"
           :totalLaps="raceState.total_laps"
+          :weather="raceState.track.current_weather"
+          :wetness="raceState.track.wetness"
         />
       </div>
       <div class="game-content">

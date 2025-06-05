@@ -33,6 +33,7 @@ pub struct RaceState {
     pub cars: HashMap<u32, Car>, // Keyed by car number
     pub run_state: RaceRunState,
     pub tick_count: u64,
+    pub tick_duration_seconds: f32,
 }
 
 impl RaceState {
@@ -103,6 +104,7 @@ impl RaceState {
             // teams,
             run_state: RaceRunState::Paused, // Start paused
             tick_count: 0,
+            tick_duration_seconds: 0.1, // 100ms
         }
     }
 
@@ -137,12 +139,52 @@ impl RaceState {
         car_data.sort_by_key(|c| c.race_position);
 
         RaceStateClientView {
-            track: self.track.clone(),
+            track: TrackClientData::new(
+                &self.track,
+                self.tick_count as f32 * self.tick_duration_seconds,
+            ),
             cars: car_data,
             current_lap: self.cars.values().map(|c| c.lap).max().unwrap_or(0), // Leader's lap
             total_laps: self.track.laps,
             race_status: self.run_state.clone(),
         }
+    }
+
+    pub fn update_weather(&mut self) {
+        // update weather
+        let rain_chance = self
+            .track
+            .weather
+            .get_state_at_time(self.tick_count as f32 * self.tick_duration_seconds);
+
+        let wetness_change = if rain_chance > 0.66 {
+            // Increasing wetness (raining)
+            // At 1.0: increase by 1 in 3 minutes (180 seconds)
+            // At 0.66: increase by 1 in 10 minutes (600 seconds)
+            // Linear interpolation between 0.66 and 1.0
+            let rate_at_100 = 1.0 / 180.0; // per second
+            let rate_at_66 = 1.0 / 600.0; // per second
+            let interpolation_factor = (rain_chance - 0.66) / (1.0 - 0.66);
+            let rate = rate_at_66 + (rate_at_100 - rate_at_66) * interpolation_factor;
+            rate * self.tick_duration_seconds
+        } else if rain_chance < 0.5 {
+            // Decreasing wetness (drying)
+            // At 0.5: decrease by 1 in 10 minutes (600 seconds)
+            // At 0.0: decrease by 1 in 1 minute (60 seconds)
+            // Linear interpolation between 0.0 and 0.5
+            let rate_at_0 = -1.0 / 60.0; // per second (negative for decrease)
+            let rate_at_50 = -1.0 / 600.0; // per second (negative for decrease)
+            let interpolation_factor = rain_chance / 0.5;
+            let rate = rate_at_0 + (rate_at_50 - rate_at_0) * interpolation_factor;
+            rate * self.tick_duration_seconds
+        } else {
+            // Between 0.5 and 0.66: stable, no change
+            0.0
+        };
+
+        // Apply wetness change and clamp between 0.0 and 1.0
+        self.track.wetness += wetness_change;
+        self.track.wetness = self.track.wetness.clamp(0.0, 1.0);
     }
 
     pub fn update(&mut self) {
@@ -151,6 +193,9 @@ impl RaceState {
         }
 
         self.tick_count += 1;
+
+        self.update_weather();
+
         let mut positions: Vec<&Car> = Vec::new(); // vector of references to cars
 
         for car in self.cars.values_mut() {
@@ -227,9 +272,8 @@ impl RaceState {
 
             // --- Update State (Only if Racing) ---
             // Calculate distance covered this tick (adjust speed based on time_scale)
-            //let base_speed_kph = 200.0; // Base speed in km/h
-            let tick_duration_seconds = 0.1; // 100ms
-            let distance_km = (car.speed / 3600.0) * tick_duration_seconds;
+
+            let distance_km = (car.speed / 3600.0) * self.tick_duration_seconds;
 
             let distance_laps = distance_km / self.track.lap_length_km;
             car.lap_percentage += distance_laps;
@@ -261,7 +305,7 @@ impl RaceState {
 
             // Update fuel consumption (example rate)
             let fuel_consumption_rate = 0.001 * car.max_speed(); // Higher performance uses more fuel
-            car.fuel -= fuel_consumption_rate * tick_duration_seconds as f32;
+            car.fuel -= fuel_consumption_rate * self.tick_duration_seconds as f32;
             car.fuel = car.fuel.max(0.0);
             if car.fuel == 0.0 && car.status == CarStatus::Racing {
                 // println!("Car {} ran out of fuel!", car.number);
@@ -272,7 +316,7 @@ impl RaceState {
             // Update tire wear (example rate)
             let tire_wear_rate = 0.0005 * car.max_speed(); // Higher performance wears tires faster
                                                            // TODO: Different wear rates for different tire types
-            car.tire.wear += tire_wear_rate * tick_duration_seconds as f32;
+            car.tire.wear += tire_wear_rate * self.tick_duration_seconds as f32;
             car.tire.wear = car.tire.wear.min(100.0); // Cap at 100%?
                                                       // TODO: Consider tire failure above certain wear
 
