@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import RaceHeader from './components/RaceHeader.vue';
 import CarsTable from './components/CarsTable.vue';
 import TrackVisualizer from './components/TrackVisualizer.vue';
@@ -10,7 +10,12 @@ import { useRaceData } from './services/WebSocketService';
 const { raceState, connected, updateCarStrategy } = useRaceData();
 const isCarTableCollapsed = ref(true);
 
-function handleCarStrategyUpdate(strategy: { carNumber: number, style: string, tire?: string, refuel?: number }) {
+function handleCarStrategyUpdate(strategy: {
+  carNumber: number;
+  style: string;
+  tire?: string;
+  refuel?: number;
+}) {
   updateCarStrategy(strategy);
 }
 </script>
@@ -19,7 +24,7 @@ function handleCarStrategyUpdate(strategy: { carNumber: number, style: string, t
   <div class="app-container">
     <div class="main-content">
       <div class="header-content">
-        <RaceHeader 
+        <RaceHeader
           :trackName="raceState.track.name"
           :elapsedTime="raceState.track.elapsed_time"
           :raceStatus="raceState.race_status"
@@ -30,22 +35,22 @@ function handleCarStrategyUpdate(strategy: { carNumber: number, style: string, t
         />
       </div>
       <div class="game-content">
-        <div class="sidebar" :class="{ 'expanded': !isCarTableCollapsed }">
+        <div class="sidebar" :class="{ expanded: !isCarTableCollapsed }">
           <div class="cars-table-container">
-            <CarsTable 
-              :cars="raceState.cars" 
+            <CarsTable
+              :cars="raceState.cars"
               v-model:collapsed="isCarTableCollapsed"
               @update-car-strategy="handleCarStrategyUpdate"
             />
           </div>
         </div>
-        
+
         <div class="track-content">
           <TrackSvg :cars="raceState.cars" :trackId="raceState.track.id" />
         </div>
       </div>
     </div>
-    
+
     <div class="footer-content">
       <TrackVisualizer :cars="raceState.cars" />
       <ConnectionStatus :connected="connected" />
@@ -105,7 +110,7 @@ body {
   position: absolute;
   background-color: #f9f7f7;
   border-radius: 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   height: auto;
   z-index: 5;
@@ -116,7 +121,7 @@ body {
   width: 100%;
   min-width: fit-content;
   z-index: 10;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
 }
 
 .cars-table-container {
@@ -157,16 +162,41 @@ body {
 }
 
 /* Pastel Team Colors */
-.team-1 { color: #2d4059; background-color: #aed9e0; } /* Pastel Blue */
-.team-2 { color: #2d4059; background-color: #ffa5a5; } /* Pastel Red */
-.team-3 { color: #2d4059; background-color: #b5e8b5; } /* Pastel Green */
-.team-4 { color: #2d4059; background-color: #ffe3a3; } /* Pastel Yellow */
-.team-5 { color: #2d4059; background-color: #739ff2; } /* Pastel Purple */
+.team-1 {
+  color: #2d4059;
+  background-color: #aed9e0;
+} /* Pastel Blue */
+.team-2 {
+  color: #2d4059;
+  background-color: #ffa5a5;
+} /* Pastel Red */
+.team-3 {
+  color: #2d4059;
+  background-color: #b5e8b5;
+} /* Pastel Green */
+.team-4 {
+  color: #2d4059;
+  background-color: #ffe3a3;
+} /* Pastel Yellow */
+.team-5 {
+  color: #2d4059;
+  background-color: #739ff2;
+} /* Pastel Purple */
 
 /* Pastel Tire Colors */
-.tire-soft { color: #e84545; } /* Softer Red */
-.tire-medium { color: #f9a826; } /* Softer Yellow */
-.tire-hard { color: #4d4d4d; } /* Softer White/Gray */
-.tire-intermediate { color: #7bc74d; } /* Softer Green */
-.tire-wet { color: #5c7aea; } /* Softer Blue */
+.tire-soft {
+  color: #e84545;
+} /* Softer Red */
+.tire-medium {
+  color: #f9a826;
+} /* Softer Yellow */
+.tire-hard {
+  color: #4d4d4d;
+} /* Softer White/Gray */
+.tire-intermediate {
+  color: #7bc74d;
+} /* Softer Green */
+.tire-wet {
+  color: #5c7aea;
+} /* Softer Blue */
 </style>

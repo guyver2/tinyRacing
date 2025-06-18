@@ -15,88 +15,87 @@
         </div>
         <button class="close-btn" @click="close">×</button>
       </div>
-      
+
       <div class="driving-styles">
-        <button 
-          class="style-btn" 
+        <button
+          class="style-btn"
           :class="{ active: selectedStyle === 'Relax' }"
           @click="selectDrivingStyle('Relax')"
         >
           Relax
         </button>
-        <button 
-          class="style-btn" 
+        <button
+          class="style-btn"
           :class="{ active: selectedStyle === 'Normal' }"
           @click="selectDrivingStyle('Normal')"
         >
           Normal
         </button>
-        <button 
-          class="style-btn" 
+        <button
+          class="style-btn"
           :class="{ active: selectedStyle === 'Aggressive' }"
           @click="selectDrivingStyle('Aggressive')"
         >
           Aggressive
         </button>
       </div>
-      
+
       <div class="pit-strategy">
         <div class="refuel-section">
           <h3>refuel</h3>
           <div class="refuel-slider">
-            <input 
-              type="range" 
-              min="0" 
-              max="100" 
-              v-model="refuelAmount"
-              class="slider"
-            />
+            <input type="range" min="0" max="100" v-model="refuelAmount" class="slider" />
             <div class="slider-labels">
               <span>0</span>
               <span>100</span>
             </div>
           </div>
         </div>
-        
+
         <div class="tire-section">
           <h3>Change tire</h3>
           <div class="tire-options">
-            <button 
-              class="tire-btn" 
-              @click="selectTire('Soft')" 
+            <button
+              class="tire-btn"
+              @click="selectTire('Soft')"
               :class="{ active: selectedTire === 'Soft' }"
             >
-              <img :src="`${ROOT_URL}/assets/tires/soft.svg`" alt="Soft" title="Soft" class="tire-icon">
+              <img :src="`/assets/tires/soft.svg`" alt="Soft" title="Soft" class="tire-icon" />
             </button>
-            <button 
-              class="tire-btn" 
-              @click="selectTire('Medium')" 
+            <button
+              class="tire-btn"
+              @click="selectTire('Medium')"
               :class="{ active: selectedTire === 'Medium' }"
             >
-              <img :src="`${ROOT_URL}/assets/tires/medium.svg`" alt="Medium" title="Medium" class="tire-icon">
+              <img
+                :src="`/assets/tires/medium.svg`"
+                alt="Medium"
+                title="Medium"
+                class="tire-icon"
+              />
             </button>
-            <button 
-              class="tire-btn" 
-              @click="selectTire('Hard')" 
+            <button
+              class="tire-btn"
+              @click="selectTire('Hard')"
               :class="{ active: selectedTire === 'Hard' }"
             >
-              <img :src="`${ROOT_URL}/assets/tires/hard.svg`" alt="Hard" title="Hard" class="tire-icon">
+              <img :src="`/assets/tires/hard.svg`" alt="Hard" title="Hard" class="tire-icon" />
             </button>
-            <button 
-              class="tire-btn" 
-              @click="selectTire('Inter')" 
+            <button
+              class="tire-btn"
+              @click="selectTire('Inter')"
               :class="{ active: selectedTire === 'Inter' }"
             >
-              <img :src="`${ROOT_URL}/assets/tires/inter.svg`" alt="Inter" title="Inter" class="tire-icon">
+              <img :src="`/assets/tires/inter.svg`" alt="Inter" title="Inter" class="tire-icon" />
             </button>
-            <button 
-              class="tire-btn" 
-              @click="selectTire('Wet')" 
+            <button
+              class="tire-btn"
+              @click="selectTire('Wet')"
               :class="{ active: selectedTire === 'Wet' }"
             >
-              <img :src="`${ROOT_URL}/assets/tires/wet.svg`" alt="Wet" title="Wet" class="tire-icon">
+              <img :src="`/assets/tires/wet.svg`" alt="Wet" title="Wet" class="tire-icon" />
             </button>
-            
+
             <button class="pit-btn" @click="executePitStop">Pit</button>
           </div>
         </div>
@@ -106,9 +105,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import type { Car } from '@/types';
-import { ROOT_URL } from '@/constants';
 
 const props = defineProps<{
   car: Car;
@@ -116,8 +114,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'close': [];
-  'update-strategy': [{ carNumber: number, style: string, tire?: string, refuel?: number }];
+  close: [];
+  'update-strategy': [{ carNumber: number; style: string; tire?: string; refuel?: number }];
 }>();
 
 const selectedStyle = ref(props.car.driving_style);
@@ -128,7 +126,7 @@ function selectDrivingStyle(style: string) {
   selectedStyle.value = style;
   emit('update-strategy', {
     carNumber: props.car.car_number,
-    style
+    style,
   });
 }
 
@@ -142,7 +140,7 @@ function executePitStop() {
       carNumber: props.car.car_number,
       style: selectedStyle.value,
       tire: selectedTire.value || undefined,
-      refuel: refuelAmount.value > 0 ? refuelAmount.value : undefined
+      refuel: refuelAmount.value > 0 ? refuelAmount.value : undefined,
     });
   }
 }
@@ -184,7 +182,8 @@ function close() {
   position: relative;
 }
 
-.driver-info, .car-info {
+.driver-info,
+.car-info {
   flex: 1;
 }
 
@@ -315,4 +314,4 @@ h3 {
   font-weight: bold;
   cursor: pointer;
 }
-</style> 
+</style>

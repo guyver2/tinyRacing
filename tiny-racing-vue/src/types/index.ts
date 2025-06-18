@@ -32,4 +32,4 @@ export interface RaceState {
   race_status: string;
   current_lap: number;
   total_laps: number;
-} 
+}
