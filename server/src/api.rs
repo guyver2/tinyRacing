@@ -140,7 +140,6 @@ pub fn create_api_router(race_state: SharedRaceState) -> Router {
         // Car control routes
         .route("/cars/{car_number}", get(get_car_status))
         .route("/cars/{car_number}/driving-style", put(set_driving_style))
-        .route("/cars/{car_number}/status", put(set_car_status))
         // Pit stop routes
         .route("/cars/{car_number}/pit", post(request_pit_stop))
         // Apply CORS middleware
@@ -285,21 +284,6 @@ async fn set_driving_style(
     Json(request): Json<DrivingStyleRequest>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
     let command = format!("order {} {}", car_number, request.style);
-    let result = commands::handle_command(command, state.race_state.clone());
-
-    // Broadcast car update event
-    let _ = broadcast_car_update(&state, car_number);
-
-    Ok(success(None, Some(result)))
-}
-
-// Set car status
-async fn set_car_status(
-    Path(car_number): Path<u32>,
-    State(state): State<AppState>,
-    Json(request): Json<CarStatusRequest>,
-) -> ApiResult<Json<ApiResponse<()>>> {
-    let command = format!("order {} {}", car_number, request.status);
     let result = commands::handle_command(command, state.race_state.clone());
 
     // Broadcast car update event

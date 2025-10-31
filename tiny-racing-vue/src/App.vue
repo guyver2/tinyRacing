@@ -7,17 +7,10 @@ import TrackSvg from './components/TrackSvg.vue';
 import ConnectionStatus from './components/ConnectionStatus.vue';
 import { useRaceData } from './services/WebSocketService';
 
-const { raceState, connected, updateCarStrategy } = useRaceData();
+const { raceState, connected } = useRaceData();
 const isCarTableCollapsed = ref(true);
 
-function handleCarStrategyUpdate(strategy: {
-  carNumber: number;
-  style: string;
-  tire?: string;
-  refuel?: number;
-}) {
-  updateCarStrategy(strategy);
-}
+
 </script>
 
 <template>
@@ -40,7 +33,6 @@ function handleCarStrategyUpdate(strategy: {
             <CarsTable
               :cars="raceState.cars"
               v-model:collapsed="isCarTableCollapsed"
-              @update-car-strategy="handleCarStrategyUpdate"
             />
           </div>
         </div>

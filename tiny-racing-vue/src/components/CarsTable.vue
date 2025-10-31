@@ -63,7 +63,6 @@
       :car="selectedCar"
       :visible="!!selectedCar"
       @close="closeStrategyForm"
-      @update-strategy="updateStrategy"
     />
   </div>
 </template>
@@ -80,9 +79,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:collapsed': [value: boolean];
-  'update-car-strategy': [
-    strategy: { carNumber: number; style: string; tire?: string; refuel?: number },
-  ];
 }>();
 
 const selectedCar = ref<Car | null>(null);
@@ -107,16 +103,6 @@ function closeStrategyForm() {
   selectedCar.value = null;
 }
 
-function updateStrategy(strategy: {
-  carNumber: number;
-  style: string;
-  tire?: string;
-  refuel?: number;
-}) {
-  emit('update-car-strategy', strategy);
-  // Optionally close the form after updating strategy
-  // selectedCar.value = null;
-}
 </script>
 
 <style scoped>

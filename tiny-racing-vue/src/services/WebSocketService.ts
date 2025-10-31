@@ -53,23 +53,6 @@ const connectWebSocket = () => {
   });
 };
 
-// Send car strategy updates to server
-const updateCarStrategy = (strategy: {
-  carNumber: number;
-  style: string;
-  tire?: string;
-  refuel?: number;
-}) => {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    const message = {
-      type: 'strategy',
-      data: strategy,
-    };
-    socket.send(JSON.stringify(message));
-    return true;
-  }
-  return false;
-};
 
 // Initialize connection
 connectWebSocket();
@@ -78,6 +61,5 @@ export const useRaceData = () => {
   return {
     raceState,
     connected: connectedState,
-    updateCarStrategy,
   };
 };

@@ -108,6 +108,8 @@
 import { ref } from 'vue';
 import type { Car } from '@/types';
 
+const API_URL = 'http://localhost:3000';
+
 const props = defineProps<{
   car: Car;
   visible: boolean;
@@ -115,7 +117,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  'update-strategy': [{ carNumber: number; style: string; tire?: string; refuel?: number }];
 }>();
 
 const selectedStyle = ref(props.car.driving_style);
@@ -124,10 +125,12 @@ const refuelAmount = ref(100);
 
 function selectDrivingStyle(style: string) {
   selectedStyle.value = style;
-  emit('update-strategy', {
-    carNumber: props.car.car_number,
-    style,
-  });
+  const requestOptions = {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ style: style }),
+  };
+  fetch(`${API_URL}/cars/${props.car.car_number}/driving-style`, requestOptions);
 }
 
 function selectTire(type: string) {
@@ -135,14 +138,12 @@ function selectTire(type: string) {
 }
 
 function executePitStop() {
-  if (selectedTire.value || refuelAmount.value > 0) {
-    emit('update-strategy', {
-      carNumber: props.car.car_number,
-      style: selectedStyle.value,
-      tire: selectedTire.value || undefined,
-      refuel: refuelAmount.value > 0 ? refuelAmount.value : undefined,
-    });
-  }
+  const requestOptions = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tires: selectedTire.value, refuel: refuelAmount.value }),
+  };
+  fetch(`${API_URL}/cars/${props.car.car_number}/pit`, requestOptions);
 }
 
 function close() {
