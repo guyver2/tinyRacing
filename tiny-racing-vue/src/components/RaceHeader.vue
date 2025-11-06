@@ -4,7 +4,7 @@
       Race: <span>{{ trackName }}</span> Time elapsed: <span>{{ formattedElapsedTime }}</span>
     </div>
     <div class="race-status">
-      Status: <span>{{ raceStatus }}</span> Lap: <span>{{ currentLap }}</span
+      Status: <button @click="startStopRace">{{ raceStatus }}</button> Lap: <span>{{ currentLap }}</span
       >/<span>{{ totalLaps }}</span>
     </div>
     <div class="weather-container">
@@ -16,6 +16,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+
+const API_URL = 'http://localhost:3000';
 
 const props = defineProps<{
   trackName: string;
@@ -41,6 +43,23 @@ const formattedElapsedTime = computed(() => {
     return `${seconds.toFixed(0)}s`;
   }
 });
+
+
+function startStopRace() {
+  const requestOptions = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "",
+  };
+  let endpoint = '';
+  if (props.raceStatus === "Paused") {
+    endpoint = '/race/start';
+  } else if (props.raceStatus === "Running") {
+    endpoint = '/race/pause';
+  }
+  fetch(`${API_URL}${endpoint}`, requestOptions); // Placeholder for starting/stopping
+}
+
 </script>
 
 <style scoped>
@@ -69,8 +88,17 @@ header {
   align-items: center;
   gap: 10px;
 }
+
 .weather-icon {
   width: 32px;
   height: 32px;
+}
+
+button {
+  background-color: #dbe2ef;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-weight: bold;
 }
 </style>

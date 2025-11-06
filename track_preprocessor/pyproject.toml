@@ -1,0 +1,13 @@
+[project]
+name = "track-preprocessor"
+version = "0.1.0"
+description = "Perform track preprocessing, compute curvature data at each point of the track."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
+    "scipy>=1.16.3",
+    "svgpathtools>=1.7.1",
+    "svgwrite>=1.4.3",
+]
