@@ -1,6 +1,6 @@
 use crate::commands;
-use crate::models::*;
-use crate::race_state::*;
+use crate::models::car::CarStatus;
+use crate::models::race::{RaceRunState, RaceState};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -309,13 +309,13 @@ async fn request_pit_stop(
         (Some(tires), Some(refuel)) => {
             command = format!("{} {} refuel {}", command, tires, refuel);
         }
-        (Some(tires), None) => {
+        (Some(tires), _) => {
             command = format!("{} {}", command, tires);
         }
-        (None, Some(refuel)) => {
+        (_, Some(refuel)) => {
             command = format!("{} refuel {}", command, refuel);
         }
-        (None, None) => {
+        (_, _) => {
             return Err(ApiError::BadRequest(
                 "Pit stop request must specify at least tire change or refuel operation."
                     .to_string(),

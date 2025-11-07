@@ -1,7 +1,31 @@
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::models::*;
+use crate::models::car::CarClientData;
+use crate::models::car::{Car, CarStatus};
+use crate::models::driver::{Driver, DrivingStyle};
+use crate::models::team::Team;
+use crate::models::tire::{ClientTireData, Tire, TireType};
+use crate::models::track::Track;
+use crate::models::track::TrackClientData;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum RaceRunState {
+    Paused,
+    Running,
+    LastLap,
+    Finished,
+}
+
+#[derive(Serialize, Debug, Clone)] // Only Serialize for sending to clients
+pub struct RaceStateClientView {
+    pub track: TrackClientData,
+    pub cars: Vec<CarClientData>,
+    pub current_lap: u32, // Max lap across all cars? Or based on leader?
+    pub total_laps: u32,
+    pub race_status: RaceRunState,
+}
 
 /// Race state module for managing the race simulation
 ///

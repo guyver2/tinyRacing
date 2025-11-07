@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tokio::time::Duration;
 
-use crate::models::*;
-use crate::race_state::*;
+use crate::models::race::{RaceState, RaceStateClientView};
+use crate::models::tire::TireType;
 
 /// UI module for the race simulation using ncurses
 ///
@@ -479,7 +479,7 @@ pub fn ui_thread_main(
                 }
             }
             Some(_) => {} // Other input types
-            None => {}    // No input
+            _ => {}       // No input
         }
 
         if ui_state.current_input == "quit" || ui_state.current_input == "exit" {

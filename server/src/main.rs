@@ -12,10 +12,8 @@ use std::sync::mpsc as std_mpsc;
 use std::thread;
 
 mod models;
-use crate::models::*;
-
-mod race_state;
-use crate::race_state::*;
+use crate::models::race::{RaceRunState, RaceState, RaceStateClientView};
+use crate::models::track::Track;
 
 mod commands;
 use crate::commands::*;

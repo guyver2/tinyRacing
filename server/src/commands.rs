@@ -1,5 +1,7 @@
-use crate::models::*;
-use crate::race_state::*;
+use crate::models::car::CarStatus;
+use crate::models::driver::DrivingStyle;
+use crate::models::race::{RaceRunState, RaceState};
+use crate::models::tire::TireType;
 use std::sync::{Arc, Mutex};
 
 /// Command handling module for the race simulation
@@ -199,12 +201,12 @@ fn handle_pit_command(
             // Format appropriate message based on operations
             let tire_msg = match &car.target_tire {
                 Some(tire) => format!("Tire -> {:?}", tire),
-                None => "No tire change".to_string(),
+                _ => "No tire change".to_string(),
             };
 
             let fuel_msg = match car.target_fuel {
                 Some(fuel) => format!("Fuel -> {}%", fuel),
-                None => "No refuel".to_string(),
+                _ => "No refuel".to_string(),
             };
 
             result_messages.push(format!(
