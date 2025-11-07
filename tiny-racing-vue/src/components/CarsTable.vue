@@ -26,14 +26,14 @@
           :key="car.car_number"
           :class="getRowClasses(car)"
           @click="selectCar(car)"
-          style="cursor: pointer"
+          :style="{'background-color': car.team.color}"
         >
           <td v-if="!collapsed" :class="{ 'top-3': car.race_position <= 3 }">
             {{ car.race_position }}
           </td>
           <td :class="{ 'top-3': car.race_position <= 3 }">{{ car.car_number }}</td>
-          <td :class="{ 'top-3': car.race_position <= 3 }">{{ car.driver }}</td>
-          <td v-if="!collapsed">{{ car.team_name }}</td>
+          <td :class="{ 'top-3': car.race_position <= 3 }">{{ car.driver.name }}</td>
+          <td v-if="!collapsed">{{ car.team.name }}</td>
           <td v-if="!collapsed">
             <img
               :src="`/assets/tires/${car.tire.type.toLowerCase()}.svg`"
@@ -84,7 +84,7 @@ const emit = defineEmits<{
 const selectedCar = ref<Car | null>(null);
 
 function getRowClasses(car: Car) {
-  const classes = [`team-${car.team_number}`];
+  const classes = [`team`];
   if (car.race_position <= 3) {
     classes.push('top-3');
   }
@@ -109,6 +109,11 @@ function closeStrategyForm() {
 .cars-table-wrapper {
   position: relative;
   width: 100%;
+}
+
+.team {
+  color: #2d4059;
+  cursor: pointer;
 }
 
 .table-footer {

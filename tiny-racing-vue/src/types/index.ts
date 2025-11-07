@@ -3,12 +3,28 @@ export interface Tire {
   wear: number;
 }
 
+export interface Team {
+  number: number;
+  name: string;
+  logo: string;
+  color: string;
+}
+
+export interface Driver {
+  name: string;
+  skill_level: number,
+  stamina: number, 
+  weather_tolerance: number, 
+  experience: number, 
+  consistency: number,
+  focus: number,
+}
+
 export interface Car {
   race_position: number;
   car_number: number;
-  driver: string;
-  team_name: string;
-  team_number: number;
+  driver: Driver;
+  team: Team;
   tire: Tire;
   fuel: number;
   track_position: number;

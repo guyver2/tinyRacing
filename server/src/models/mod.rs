@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 // weather module
 pub mod weather;
 pub use weather::{Weather, WeatherState};
@@ -20,7 +21,7 @@ pub use tire::{ClientTireData, Tire, TireType};
 
 // team module
 pub mod team;
-pub use team::{Team, TeamStats};
+pub use team::Team;
 
 // race module
 pub mod race;

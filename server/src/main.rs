@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 
@@ -13,7 +14,6 @@ use std::thread;
 
 mod models;
 use crate::models::race::{RaceRunState, RaceState, RaceStateClientView};
-use crate::models::track::Track;
 
 mod commands;
 use crate::commands::*;
@@ -149,9 +149,13 @@ async fn main() {
         std::process::exit(1);
     }
 
-    match Track::load_track_config(args[1].as_str()) {
-        Ok(track_config) => {
-            let initial_state = RaceState::new(track_config.clone());
+    //match Track::load_track_config(args[1].as_str()) {
+    //    Ok(track_config) => {
+    //        let initial_state = RaceState::new(track_config.clone());
+    match RaceState::load_race_config(args[1].as_str()) {
+        Ok(initial_state) => {
+            let track_id = initial_state.track.id.clone();
+            let track_name = initial_state.track.name.clone();
             let shared_state = Arc::new(Mutex::new(initial_state));
             let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
 
@@ -175,7 +179,7 @@ async fn main() {
 
             // --- Spawn UI Thread ---
             let ui_log_tx = log_tx.clone(); // Clone for initial messages
-            let initial_track_name_for_ui = track_config.name.clone();
+            let initial_track_name_for_ui = track_name.clone();
             let shared_state_for_ui = Arc::clone(&shared_state);
             thread::spawn(move || {
                 ui_thread_main(
@@ -189,10 +193,7 @@ async fn main() {
 
             ui_log_tx.send("UI thread started.".to_string()).ok();
             ui_log_tx
-                .send(format!(
-                    "Track loaded: {}:{}",
-                    track_config.id, track_config.name
-                ))
+                .send(format!("Track loaded: {}:{}", track_id, track_name))
                 .ok();
 
             // Log that the API is available

@@ -153,28 +153,6 @@ body {
   margin-bottom: 15px;
 }
 
-/* Pastel Team Colors */
-.team-1 {
-  color: #2d4059;
-  background-color: #aed9e0;
-} /* Pastel Blue */
-.team-2 {
-  color: #2d4059;
-  background-color: #ffa5a5;
-} /* Pastel Red */
-.team-3 {
-  color: #2d4059;
-  background-color: #b5e8b5;
-} /* Pastel Green */
-.team-4 {
-  color: #2d4059;
-  background-color: #ffe3a3;
-} /* Pastel Yellow */
-.team-5 {
-  color: #2d4059;
-  background-color: #739ff2;
-} /* Pastel Purple */
-
 /* Pastel Tire Colors */
 .tire-soft {
   color: #e84545;

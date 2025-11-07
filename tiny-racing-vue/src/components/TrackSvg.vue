@@ -20,13 +20,6 @@ const props = defineProps<{
 
 const trackContainer = ref<HTMLElement | null>(null);
 const trackData = ref<TrackData | null>(null);
-const teamColors = {
-  'Red Bull': '#aed9e0',
-  Ferrari: '#ffa5a5',
-  Mercedes: '#b5e8b5',
-  McLaren: '#ffe3a3',
-  Alpine: '#739ff2',
-};
 
 async function loadTrack() {
   if (!props.trackId) return;
@@ -117,7 +110,7 @@ function updateCarPositions() {
         svgCar.setAttribute('r', '10');
         svgCar.setAttribute(
           'fill',
-          teamColors[car.team_name as keyof typeof teamColors] || '#aaaaaa',
+          car.team.color,
         );
         svgCar.setAttribute('style', 'transition: cx 0.5s ease-out, cy 0.5s ease-out;');
         svg.appendChild(svgCar);

@@ -82,11 +82,6 @@ struct DrivingStyleRequest {
 }
 
 #[derive(Deserialize)]
-struct CarStatusRequest {
-    status: String,
-}
-
-#[derive(Deserialize)]
 struct PitStopRequest {
     tires: Option<String>,
     refuel: Option<f32>,

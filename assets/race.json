@@ -1,0 +1,223 @@
+{
+    "track": {
+       "name": "test",
+       "laps": 10
+    },
+    "teams": [
+         {
+             "data": {
+                "number": 1,
+                "name": "Red Bull",
+                "color": "#aed9e0",
+                "logo": "red_bull_logo.png",
+                "pit_efficiency": 0.9
+             },
+             "driver_1": {
+                "name": "Max Verstappen",
+                "skill_level": 0.95,
+                "stamina": 0.92,
+                "weather_tolerance": 0.90,
+                "experience": 0.88,
+                "consistency": 0.93,
+                "focus": 0.94
+             },
+            "driver_2": {
+                "name": "Yuki Tsunoda", 
+                "skill_level": 0.82,
+                "stamina": 0.85,
+                "weather_tolerance": 0.80,
+                "experience": 0.75,
+                "consistency": 0.78,
+                "focus": 0.83
+            },
+            "car_1":{
+                "handling": 0.8,
+                "acceleration": 0.75,
+                "top_speed": 0.8,
+                "reliability": 0.87,
+                "fuel_consumption": 0.6,
+                "tire_wear": 0.5
+            },
+            "car_2":{
+                "handling": 0.8,
+                "acceleration": 0.75,
+                "top_speed": 0.8,
+                "reliability": 0.87,
+                "fuel_consumption": 0.6,
+                "tire_wear": 0.5
+            }
+         },
+         {
+             "data": {
+                "number": 2,
+                "name": "Ferrari",
+                "color": "#ffa5a5",
+                "logo": "ferrari_logo.png",
+                "pit_efficiency": 0.75
+             },
+             "driver_1": {
+                "name": "Charles Leclerc",
+                "skill_level": 0.93,
+                "stamina": 0.88,
+                "weather_tolerance": 0.85,
+                "experience": 0.86,
+                "consistency": 0.84,
+                "focus": 0.90
+             },
+            "driver_2": {
+                "name": "Lewis Hamilton",
+                "skill_level": 0.94,
+                "stamina": 0.90,
+                "weather_tolerance": 0.92,
+                "experience": 0.95,
+                "consistency": 0.91,
+                "focus": 0.93
+            },
+            "car_1":{
+                "handling": 0.7,
+                "acceleration": 0.65,
+                "top_speed": 0.8,
+                "reliability": 0.87,
+                "fuel_consumption": 0.55,
+                "tire_wear": 0.5
+            },
+            "car_2":{
+                "handling": 0.7,
+                "acceleration": 0.65,
+                "top_speed": 0.8,
+                "reliability": 0.87,
+                "fuel_consumption": 0.55,
+                "tire_wear": 0.5
+            }
+         },
+         {
+             "data": {
+                "number": 3,
+                "name": "Mercedes",
+                "color": "#b5e8b5",
+                "logo": "mercedes_logo.png",
+                "pit_efficiency": 0.9
+             },
+             "driver_1": {
+                "name": "George Russell",
+                "skill_level": 0.89,
+                "stamina": 0.87,
+                "weather_tolerance": 0.84,
+                "experience": 0.82,
+                "consistency": 0.85,
+                "focus": 0.88
+             },
+            "driver_2": {
+                "name": "Kimi Antonelli",
+                "skill_level": 0.75,
+                "stamina": 0.78,
+                "weather_tolerance": 0.72,
+                "experience": 0.65,
+                "consistency": 0.70,
+                "focus": 0.80
+            },
+            "car_1":{
+                "handling": 0.65,
+                "acceleration": 0.75,
+                "top_speed": 0.78,
+                "reliability": 0.95,
+                "fuel_consumption": 0.65,
+                "tire_wear": 0.6
+            },
+            "car_2":{
+                "handling": 0.65,
+                "acceleration": 0.75,
+                "top_speed": 0.78,
+                "reliability": 0.95,
+                "fuel_consumption": 0.65,
+                "tire_wear": 0.6
+            }
+         },
+         {
+             "data": {
+                "number": 4,
+                "name": "McLaren",
+                "color": "#ffe3a3",
+                "logo": "mclaren_logo.png",
+                "pit_efficiency": 0.8
+             },
+             "driver_1": {
+                "name": "Lando Norris",
+                "skill_level": 0.90,
+                "stamina": 0.88,
+                "weather_tolerance": 0.85,
+                "experience": 0.84,
+                "consistency": 0.87,
+                "focus": 0.89
+             },
+            "driver_2": {
+                "name": "Oscar Piastri",
+                "skill_level": 0.85,
+                "stamina": 0.84,
+                "weather_tolerance": 0.80,
+                "experience": 0.75,
+                "consistency": 0.82,
+                "focus": 0.86
+            },
+            "car_1":{
+                "handling": 0.85,
+                "acceleration": 0.85,
+                "top_speed": 0.85,
+                "reliability": 0.95,
+                "fuel_consumption": 0.65,
+                "tire_wear": 0.6
+            },
+            "car_2":{
+                "handling": 0.85,
+                "acceleration": 0.85,
+                "top_speed": 0.85,
+                "reliability": 0.95,
+                "fuel_consumption": 0.65,
+                "tire_wear": 0.6
+            }
+         },
+         {
+             "data": {
+                "number": 5,
+                "name": "Alpine",
+                "color": "#739ff2",
+                "logo": "alpine_logo.png",
+                "pit_efficiency": 0.8
+             },
+             "driver_1": {
+                "name": "Pierre Gasly",
+                "skill_level": 0.86,
+                "stamina": 0.85,
+                "weather_tolerance": 0.83,
+                "experience": 0.84,
+                "consistency": 0.82,
+                "focus": 0.85
+             },
+            "driver_2": {
+                "name": "Isack Hadjar",
+                "skill_level": 0.76,
+                "stamina": 0.80,
+                "weather_tolerance": 0.75,
+                "experience": 0.70,
+                "consistency": 0.73,
+                "focus": 0.78
+            },
+            "car_1":{
+                "handling": 0.65,
+                "acceleration": 0.65,
+                "top_speed": 0.65,
+                "reliability": 0.45,
+                "fuel_consumption": 0.55,
+                "tire_wear": 0.3
+            },
+            "car_2":{
+                "handling": 0.65,
+                "acceleration": 0.65,
+                "top_speed": 0.65,
+                "reliability": 0.45,
+                "fuel_consumption": 0.55,
+                "tire_wear": 0.3
+            }
+         }
+    ]
+}

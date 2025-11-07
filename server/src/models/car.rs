@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::driver::{Driver, DrivingStyle};
+use crate::models::team::Team;
 use crate::models::tire::{ClientTireData, Tire, TireType};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
@@ -20,17 +21,27 @@ pub struct CarStats {
     pub reliability: f32,      // how reliable the car is, reliability decreases with race time
     pub fuel_consumption: f32, // how much fuel the car consumes
     pub tire_wear: f32,        // how much tire wear the car gets
-    pub pit_stop_time: f32,    // how long the pit stop takes
-    pub pit_stop_fuel: f32,    // how much fuel the car consumes during a pit stop
-    pub pit_stop_tire: f32,    // how much tire wear the car gets during a pit stop
+}
+
+impl CarStats {
+    pub fn new() -> Self {
+        CarStats {
+            handling: 0.5,
+            acceleration: 0.5,
+            top_speed: 0.5,
+            reliability: 0.5,
+            fuel_consumption: 0.5,
+            tire_wear: 0.5,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Car {
     pub number: u32,
-    pub team_number: u32,
-    pub team_name: String,
+    pub team: Team,
     pub driver: Driver,
+    pub stats: CarStats,
     // pub car_stats: CarStats,
     pub tire: Tire,
     pub fuel: f32, // 0.0 to 100.0 %
@@ -94,9 +105,9 @@ impl Car {
 #[derive(Serialize, Debug, Clone)] // Only Serialize for sending to clients
 pub struct CarClientData {
     pub car_number: u32,
-    pub driver: String,    // Just the name for the client
-    pub team_number: u32,  // Team number
-    pub team_name: String, // Added for UI
+    pub driver: Driver, // Just the name for the client
+    pub carstats: CarStats,
+    pub team: Team,
     pub race_position: u32,
     pub track_position: f32, // Combined lap.percentage
     pub status: CarStatus,

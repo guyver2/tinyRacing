@@ -5,8 +5,7 @@
       v-for="car in cars"
       :key="car.car_number"
       class="car-marker"
-      :class="`team-${car.team_number}`"
-      :style="{ left: `${(car.track_position % 1) * 100}%` }"
+      :style="{ left: `${(car.track_position % 1) * 100}%`, backgroundColor: car.team.color }"
     >
       {{ car.car_number }}
     </div>
@@ -43,6 +42,7 @@ defineProps<{
   transform: translateY(-50%);
 }
 .car-marker {
+  color: #2d4059;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);

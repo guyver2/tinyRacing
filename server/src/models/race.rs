@@ -1,9 +1,9 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::{self};
 
-use crate::models::car::CarClientData;
-use crate::models::car::{Car, CarStatus};
+use crate::models::car::{Car, CarClientData, CarStats, CarStatus};
 use crate::models::driver::{Driver, DrivingStyle};
 use crate::models::team::Team;
 use crate::models::tire::{ClientTireData, Tire, TireType};
@@ -61,6 +61,60 @@ pub struct RaceState {
 }
 
 impl RaceState {
+    pub fn load_race_config(config_path: &str) -> Result<RaceState, io::Error> {
+        let mut cars = HashMap::new();
+        let mut rng = rand::rng();
+
+        let config = read_race_config(config_path).unwrap();
+        let track_folder = format!("../assets/tracks/{}", config.track.name);
+        let mut track = Track::load_track_config(&track_folder).unwrap();
+        track.laps = config.track.laps;
+
+        let mut car_number = 1;
+
+        for team_data in config.teams.iter() {
+            for (driver, car_stats) in vec![
+                (&team_data.driver_1, &team_data.car_1),
+                (&team_data.driver_2, &team_data.car_2),
+            ] {
+                let car = Car {
+                    number: car_number,
+                    team: team_data.data.clone(),
+                    driver: driver.clone(),
+                    stats: car_stats.clone(),
+                    tire: Tire {
+                        type_: TireType::Medium,
+                        wear: 0.0,
+                    },
+                    fuel: 100.0,
+                    driving_style: DrivingStyle::Normal,
+                    status: CarStatus::Racing,
+                    race_position: car_number, // Initial placeholder
+                    lap: 0,
+                    lap_percentage: 0.0,
+                    total_distance: 0.0,
+                    finished_time: 0,
+                    speed: 0.0,
+                    base_performance: rng.random_range(0.9..1.1),
+                    pit_request: false,
+                    target_tire: None,
+                    target_fuel: None,
+                    pit_time_remaining: 0,
+                };
+                cars.insert(car_number, car);
+                car_number += 1;
+            }
+        }
+
+        Ok(RaceState {
+            track,
+            cars,
+            run_state: RaceRunState::Paused, // Start paused
+            tick_count: 0,
+            tick_duration_seconds: 0.1, // 100ms
+        })
+    }
+
     pub fn new(track: Track) -> Self {
         let mut cars = HashMap::new();
         let mut teams = HashMap::new();
@@ -77,15 +131,14 @@ impl RaceState {
         }
 
         for i in 0..5 {
-            let team_number = (i + 1) as u32;
-            let team_name_str = team_names[i as usize].to_string();
-            teams.insert(
-                team_number,
-                Team {
-                    number: team_number,
-                    name: team_name_str.clone(),
-                },
-            );
+            let team = Team {
+                number: (i + 1) as u32,
+                name: team_names[i as usize].to_string(),
+                logo: format!("team_{}.png", i + 1),
+                color: "#ea02a4ff".to_string(),
+                pit_efficiency: 0.5,
+            };
+            teams.insert(team.number, team.clone());
 
             for j in 0..2 {
                 let car_index = i * 2 + j;
@@ -96,9 +149,9 @@ impl RaceState {
 
                 let car = Car {
                     number: car_number,
-                    team_number,
-                    team_name: team_name_str.clone(),
+                    team: team.clone(),
                     driver,
+                    stats: CarStats::new(),
                     tire: Tire {
                         type_: TireType::Medium,
                         wear: 0.0,
@@ -125,7 +178,6 @@ impl RaceState {
         RaceState {
             track,
             cars,
-            // teams,
             run_state: RaceRunState::Paused, // Start paused
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
@@ -141,9 +193,9 @@ impl RaceState {
                 let track_position = car.lap as f32 + car.lap_percentage;
                 CarClientData {
                     car_number: car.number,
-                    driver: car.driver.name.clone(),
-                    team_number: car.team_number,
-                    team_name: car.team_name.clone(), // Use stored team_name
+                    driver: car.driver.clone(),
+                    carstats: car.stats.clone(),
+                    team: car.team.clone(),
                     race_position: car.race_position,
                     track_position: track_position, // Combined lap.percentage
                     status: car.status.clone(),
@@ -456,4 +508,33 @@ fn load_drivers_from_json(file_path: &str) -> Vec<Driver> {
         .iter()
         .map(|v| Driver::new(&serde_json::to_string(v).unwrap()))
         .collect::<Vec<_>>()
+}
+
+#[derive(Debug, Deserialize)]
+struct TrackConfig {
+    name: String,
+    laps: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct TeamConfig {
+    data: Team,
+    driver_1: Driver,
+    driver_2: Driver,
+    car_1: CarStats,
+    car_2: CarStats,
+}
+
+#[derive(Debug, Deserialize)]
+struct RaceConfig {
+    track: TrackConfig,
+    teams: Vec<TeamConfig>,
+}
+
+fn read_race_config(file_path: &str) -> Result<RaceConfig, Box<dyn std::error::Error>> {
+    let data = std::fs::read_to_string(file_path)
+        .expect(format!("Failed to read config file {file_path}").as_str());
+    let config: RaceConfig = serde_json::from_str(&data)
+        .expect(format!("Failed to parse config file {file_path}").as_str());
+    Ok(config)
 }

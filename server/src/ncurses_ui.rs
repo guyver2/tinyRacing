@@ -112,7 +112,7 @@ fn draw_ui(
 
             // Determine color pair based on team number (1-based)
             let color_pair_num = if has_color_support {
-                match car_data.team_number {
+                match car_data.team.number {
                     1 => 1,
                     2 => 2,
                     3 => 3,
@@ -151,7 +151,7 @@ fn draw_ui(
                 &format!(
                     "{:<5} {:<16} ",
                     car_data.car_number,
-                    &car_data.driver[..std::cmp::min(car_data.driver.len(), 16)]
+                    &car_data.driver.name[..std::cmp::min(car_data.driver.name.len(), 16)]
                 ),
             );
 
@@ -161,7 +161,7 @@ fn draw_ui(
                 27, // Position after driver
                 &format!(
                     "{:<10} ",
-                    &car_data.team_name[..std::cmp::min(car_data.team_name.len(), 10)]
+                    &car_data.team.name[..std::cmp::min(car_data.team.name.len(), 10)]
                 ),
             );
 
@@ -305,7 +305,7 @@ fn draw_ui(
             let clamped_x = track_x_pos.max(1).min(max_x - 3);
 
             // Display car marker with team color
-            let team_color = match car.team_number {
+            let team_color = match car.team.number {
                 1 => 1,
                 2 => 2,
                 3 => 3,

@@ -4,8 +4,8 @@
       <div class="header">
         <div class="driver-info">
           <h2>Driver Info</h2>
-          <div>{{ car.driver }} - Car #{{ car.car_number }}</div>
-          <div>Team: {{ car.team_name }}</div>
+          <div>{{ car.driver.name }} - Car #{{ car.car_number }}</div>
+          <div>Team: {{ car.team.name }}</div>
         </div>
         <div class="car-info">
           <h2>Car Info</h2>
