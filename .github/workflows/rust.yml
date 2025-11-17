@@ -16,8 +16,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       working-directory: ./server
       run: cargo build --verbose
+      env:
+        SQLX_OFFLINE: true
     #- name: Run tests
     #  run: cargo test --verbose
