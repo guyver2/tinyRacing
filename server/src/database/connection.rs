@@ -31,9 +31,7 @@ impl Database {
     /// Run database migrations
     /// Note: The path is relative to the crate root (where Cargo.toml is located)
     pub async fn migrate(&self) -> Result<(), DatabaseError> {
-        sqlx::migrate!("./migrations")
-            .run(&self.pool)
-            .await?;
+        sqlx::migrate!("./migrations").run(&self.pool).await?;
         Ok(())
     }
 
@@ -42,4 +40,3 @@ impl Database {
         &self.pool
     }
 }
-

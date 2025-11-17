@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -20,13 +20,19 @@ pub struct TeamDb {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DriverDb {
     pub id: Uuid,
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub date_of_birth: NaiveDate,
+    pub nationality: String,
+    pub gender: String,
     pub skill_level: f32,
     pub stamina: f32,
     pub weather_tolerance: f32,
     pub experience: f32,
     pub consistency: f32,
     pub focus: f32,
+    pub team_id: Option<Uuid>,
+    pub car_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -36,8 +42,7 @@ pub struct DriverDb {
 pub struct CarDb {
     pub id: Uuid,
     pub number: i32,
-    pub team_id: Uuid,
-    pub driver_id: Uuid,
+    pub team_id: Option<Uuid>,
     pub handling: f32,
     pub acceleration: f32,
     pub top_speed: f32,
@@ -58,7 +63,6 @@ pub struct TrackDb {
     pub description: Option<String>,
     pub laps: i32,
     pub lap_length_km: f32,
-    pub svg_start_offset: f32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -85,20 +89,25 @@ pub struct CreateTeamRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDriverRequest {
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub date_of_birth: NaiveDate,
+    pub nationality: String,
+    pub gender: String,
     pub skill_level: f32,
     pub stamina: f32,
     pub weather_tolerance: f32,
     pub experience: f32,
     pub consistency: f32,
     pub focus: f32,
+    pub team_id: Option<Uuid>,
+    pub car_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCarRequest {
     pub number: i32,
-    pub team_id: Uuid,
-    pub driver_id: Uuid,
+    pub team_id: Option<Uuid>,
     pub handling: f32,
     pub acceleration: f32,
     pub top_speed: f32,
@@ -115,7 +124,6 @@ pub struct CreateTrackRequest {
     pub description: Option<String>,
     pub laps: i32,
     pub lap_length_km: f32,
-    pub svg_start_offset: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,4 +131,3 @@ pub struct CreatePlayerRequest {
     pub username: String,
     pub email: Option<String>,
 }
-
