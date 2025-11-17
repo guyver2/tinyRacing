@@ -1,23 +1,22 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: tiny_racing_db
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: tiny_racing
-      POSTGRES_PASSWORD: tiny_racing_password
-      POSTGRES_DB: tiny_racing
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PORT: ${DB_PORT}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${DB_DATA_DIR}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tiny_racing"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-volumes:
-  postgres_data:
 

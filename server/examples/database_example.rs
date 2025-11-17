@@ -1,14 +1,15 @@
 // Example usage of the database module
 // Run with: cargo run --example database_example
 
+use chrono::NaiveDate;
 use tiny_racing::database::*;
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get database URL from environment or use default
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing".to_string());
+    let database_url = std::env::var("DB_URL").unwrap_or_else(|_| {
+        "postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing".to_string()
+    });
 
     println!("Connecting to database...");
     let db = Database::new(&database_url).await?;
@@ -32,31 +33,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     println!("Created team: {} (ID: {})", team.name, team.id);
 
-    // Create a driver
-    println!("\nCreating a driver...");
-    let driver = create_driver(
-        db.pool(),
-        CreateDriverRequest {
-            name: "Max Verstappen".to_string(),
-            skill_level: 0.95,
-            stamina: 0.90,
-            weather_tolerance: 0.85,
-            experience: 0.92,
-            consistency: 0.88,
-            focus: 0.93,
-        },
-    )
-    .await?;
-    println!("Created driver: {} (ID: {})", driver.name, driver.id);
-
     // Create a car
     println!("\nCreating a car...");
     let car = create_car(
         db.pool(),
         CreateCarRequest {
             number: 33,
-            team_id: team.id,
-            driver_id: driver.id,
+            team_id: Some(team.id),
             handling: 0.92,
             acceleration: 0.94,
             top_speed: 0.96,
@@ -69,6 +52,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     println!("Created car #{} (ID: {})", car.number, car.id);
 
+    // Create a driver
+    println!("\nCreating a driver...");
+    let driver = create_driver(
+        db.pool(),
+        CreateDriverRequest {
+            first_name: "Max".to_string(),
+            last_name: "Verstappen".to_string(),
+            date_of_birth: NaiveDate::from_ymd_opt(1997, 9, 30).unwrap(),
+            nationality: "Dutch".to_string(),
+            gender: "Male".to_string(),
+            skill_level: 0.95,
+            stamina: 0.90,
+            weather_tolerance: 0.85,
+            experience: 0.92,
+            consistency: 0.88,
+            focus: 0.93,
+            team_id: Some(team.id),
+            car_id: Some(car.id),
+        },
+    )
+    .await?;
+    println!(
+        "Created driver: {} (ID: {})",
+        driver.first_name + " " + &driver.last_name,
+        driver.id
+    );
+
     // Create a track
     println!("\nCreating a track...");
     let track = create_track(
@@ -79,7 +89,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             description: Some("A challenging desert circuit".to_string()),
             laps: 57,
             lap_length_km: 5.412,
-            svg_start_offset: 0.0,
         },
     )
     .await?;
@@ -118,8 +127,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Cars for team '{}': {}", team.name, team_cars.len());
 
     // Get driver by name
-    if let Some(driver) = get_driver_by_name(db.pool(), "Max Verstappen").await? {
-        println!("Found driver: {} (skill: {})", driver.name, driver.skill_level);
+    if let Some(driver) =
+        get_driver_by_first_and_last_name(db.pool(), "Max".to_string(), "Verstappen".to_string())
+            .await?
+    {
+        println!(
+            "Found driver: {} (skill: {})",
+            driver.first_name + " " + &driver.last_name,
+            driver.skill_level
+        );
     }
 
     // List all tracks
@@ -134,4 +150,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

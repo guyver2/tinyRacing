@@ -5,4 +5,3 @@ pub mod queries;
 pub use connection::{Database, DatabaseError};
 pub use models::*;
 pub use queries::*;
-

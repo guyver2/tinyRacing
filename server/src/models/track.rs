@@ -19,7 +19,6 @@ pub struct TrackConfig {
     pub description: Option<String>,
     pub laps: u32,
     pub lap_length_km: f32,
-    pub svg_start_offset: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
