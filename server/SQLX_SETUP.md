@@ -49,33 +49,38 @@ let team = sqlx::query_as!(
 - **Type parameter**: Pass the type as the first argument: `query_as!(Type, "SQL", ...)`
 - **Bindings**: Pass bind parameters as additional arguments instead of `.bind()`
 
-### 4. Optional: Offline Mode (for CI/CD)
+### 4. Offline Mode (Required for CI/CD)
 
-If you want to compile without a database connection (useful for CI/CD):
+**This is already configured!** CI is set up to use offline mode via the `SQLX_OFFLINE=true` environment variable.
 
-1. Install sqlx-cli:
+#### Generating Offline Metadata
+
+When you add or modify queries, regenerate the offline metadata:
+
+1. Make sure your database is running:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. Install sqlx-cli (if not already installed):
    ```bash
    cargo install sqlx-cli
    ```
 
-2. Generate offline metadata:
+3. Generate offline metadata:
    ```bash
    cd server
    export DATABASE_URL=postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing
-   sqlx prepare --database-url "$DATABASE_URL"
+   cargo sqlx prepare --database-url "$DATABASE_URL"
    ```
 
-3. This creates a `.sqlx/` directory with query metadata.
+4. **Commit the `.sqlx/` directory to git** (it's not in `.gitignore`). This allows CI to compile without a database connection.
 
-4. Add to `.gitignore`:
-   ```
-   .sqlx/
-   ```
+#### How It Works
 
-5. In CI/CD, use:
-   ```bash
-   cargo sqlx prepare --check
-   ```
+- **Locally**: sqlx can connect to your database during compilation for validation
+- **In CI**: With `SQLX_OFFLINE=true`, sqlx uses the committed `.sqlx/` metadata files instead
+- **After query changes**: Regenerate and commit the `.sqlx/` directory
 
 ## Example Conversion
 
