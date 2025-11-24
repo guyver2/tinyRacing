@@ -59,6 +59,7 @@ pub struct Car {
     pub target_tire: Option<TireType>,
     pub target_fuel: Option<f32>,
     pub pit_time_remaining: u32, // Ticks remaining in pit stop
+    pub player_uuid: Option<String>,
 }
 
 impl Car {
@@ -116,4 +117,5 @@ pub struct CarClientData {
     pub driving_style: DrivingStyle,
     pub speed: f32,         // Current speed in km/h
     pub finished_time: u64, // Ticks taken to finish
+    pub player_uuid: Option<String>,
 }

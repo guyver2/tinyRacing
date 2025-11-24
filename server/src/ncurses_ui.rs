@@ -69,6 +69,14 @@ impl UiState {
     }
 }
 
+fn manual_or_auto_player(player_uuid: Option<&String>) -> String {
+    if let Some(_uuid) = player_uuid {
+        return "Human".to_string();
+    } else {
+        return "AI".to_string();
+    }
+}
+
 fn draw_ui(
     window: &Window,
     race_view_opt: &Option<RaceStateClientView>,
@@ -100,8 +108,8 @@ fn draw_ui(
 
     // Line 1: Header for cars - Make it bold
     window.attron(A_BOLD);
-    window.mvprintw(1,0, &format!("{:<3} {:<5} {:<16} {:<10} {:<10} {:<6} {:<5} {:<5} {:<6} {:<8} {:<10} {:<7} {:<10} {:<10}",
-        "Pos", "Car#", "Driver", "Team", "Tire", "Wear", "Fuel", "Lap#", "Lap%%", "Status", "Style", "Speed", "Finished T", "Distance"));
+    window.mvprintw(1,0, &format!("{:<3} {:<5} {:<16} {:<10} {:<10} {:<6} {:<5} {:<5} {:<6} {:<8} {:<10} {:<7} {:<10} {:<10} {:<6}",
+        "Pos", "Car#", "Driver", "Team", "Tire", "Wear", "Fuel", "Lap#", "Lap%%", "Status", "Style", "Speed", "Finished T", "Distance", "Player"));
     window.attroff(A_BOLD);
 
     if let Some(race_view) = race_view_opt {
@@ -188,7 +196,7 @@ fn draw_ui(
                 line,
                 49, // Position after tire type
                 &format!(
-                    "{:<5.1} {:<5.1} {:<5} {:<5.1}%% {:<8} {:<10} {:<7.1} {:<10} {:<10}",
+                    "{:<5.1} {:<5.1} {:<5} {:<5.1}%% {:<8} {:<10} {:<7.1} {:<10} {:<1.8} {:<6}",
                     car_data.tire.wear,
                     car_data.fuel,
                     car_data.track_position.trunc() as u32,
@@ -197,7 +205,8 @@ fn draw_ui(
                     format!("{:?}", car_data.driving_style),
                     car_data.speed,
                     car_data.finished_time,
-                    car_data.track_position
+                    car_data.track_position,
+                    manual_or_auto_player(car_data.player_uuid.as_ref()).clone(),
                 ),
             );
 

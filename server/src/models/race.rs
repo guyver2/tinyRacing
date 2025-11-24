@@ -60,6 +60,64 @@ pub struct RaceState {
     pub tick_duration_seconds: f32,
 }
 
+pub struct PitDecision {
+    pub pit: bool,
+    pub tire: Option<TireType>,
+    pub fuel: Option<f32>,
+}
+
+
+fn is_ai_player(player_uuid: &Option<String>) -> bool {
+    player_uuid.is_none()
+}
+
+
+pub fn ai_pit_decision(car: Car, track_wetness: f32, total_laps: u32) -> PitDecision{
+    // skip if not AI, already pitting or pitted
+    if !is_ai_player(&car.player_uuid) || car.pit_request || car.status == CarStatus::Pit {
+        return PitDecision { pit: false, tire: None, fuel: None };
+    }
+    let mut needs_pit = false;
+    if car.fuel < 90.0 {
+        needs_pit = true;
+    }
+    let laps_remaining = total_laps.saturating_sub(car.lap);
+
+    // Decide tire type based on track wetness and laps remaining
+    let best_tire = if track_wetness > 0.65 {
+        TireType::Wet
+    } else if track_wetness > 0.2 {
+        TireType::Intermediate
+    } else {
+        // Dry tire strategy: harder compounds for more laps left, softer for fewer laps left
+        if laps_remaining > 12 {
+            TireType::Hard
+        } else if laps_remaining > 6 {
+            TireType::Medium
+        } else {
+            TireType::Soft
+        }
+    };
+    // check if we need to change tire because of track condition change
+    if (matches!(best_tire, TireType::Intermediate | TireType::Wet) && matches!(car.tire.type_, TireType::Soft | TireType::Medium | TireType::Hard))
+    || (matches!(car.tire.type_, TireType::Intermediate | TireType::Wet) && matches!(best_tire, TireType::Soft | TireType::Medium | TireType::Hard)) {
+        needs_pit = true;
+    }
+    if needs_pit {
+        println!("AI car {} requests pit: tire {:?}, fuel {:?}", car.number, best_tire, 100.0);
+        return PitDecision{ 
+            pit: true,
+            tire: Some(best_tire.clone()),
+            fuel: Some(100.0),
+        }
+    } else {
+        return PitDecision { pit: false, tire: None, fuel: None };
+    }
+}
+
+
+
+
 impl RaceState {
     pub fn load_race_config(config_path: &str) -> Result<RaceState, io::Error> {
         let mut cars = HashMap::new();
@@ -100,6 +158,7 @@ impl RaceState {
                     target_tire: None,
                     target_fuel: None,
                     pit_time_remaining: 0,
+                    player_uuid: team_data.player_uuid.clone(),
                 };
                 cars.insert(car_number, car);
                 car_number += 1;
@@ -170,6 +229,7 @@ impl RaceState {
                     target_tire: None,
                     target_fuel: None,
                     pit_time_remaining: 0,
+                    player_uuid: None,
                 };
                 cars.insert(car_number, car);
             }
@@ -207,6 +267,7 @@ impl RaceState {
                     driving_style: car.driving_style.clone(),
                     speed: car.speed, // Use the speed from Car struct
                     finished_time: car.finished_time,
+                    player_uuid: car.player_uuid.clone(),
                 }
             })
             .collect();
@@ -263,6 +324,9 @@ impl RaceState {
         self.track.wetness = self.track.wetness.clamp(0.0, 1.0);
     }
 
+    
+
+    
     pub fn update(&mut self) {
         if self.run_state != RaceRunState::Running && self.run_state != RaceRunState::LastLap {
             return; // Don't update if paused or finished
@@ -303,6 +367,14 @@ impl RaceState {
                 }
                 positions.push(car);
                 continue; // Skip normal updates while pitting
+            }
+
+            // --- Handle AI input ---
+            let decision = ai_pit_decision(car.clone(), self.track.wetness, self.track.laps);
+            if decision.pit == true {
+                car.pit_request = true;
+                car.target_fuel = decision.fuel;
+                car.target_tire = decision.tire;
             }
 
             // --- Calculate Performance Factors (Only if Racing) ---
@@ -523,6 +595,7 @@ struct TeamConfig {
     driver_2: Driver,
     car_1: CarStats,
     car_2: CarStats,
+    player_uuid: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

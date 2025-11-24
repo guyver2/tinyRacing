@@ -12,6 +12,7 @@
                 "logo": "red_bull_logo.png",
                 "pit_efficiency": 0.9
              },
+             "player_uuid": "123e4567-e89b-12d3-a456-426614174000",
              "driver_1": {
                 "name": "Alphonse Toutdroit",
                 "skill_level": 0.95,
@@ -55,6 +56,7 @@
                 "logo": "ferrari_logo.png",
                 "pit_efficiency": 0.75
              },
+             "player_uuid": null,
              "driver_1": {
                 "name": "Bon Jambon",
                 "skill_level": 0.93,
