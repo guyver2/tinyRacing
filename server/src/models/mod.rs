@@ -26,3 +26,7 @@ pub use team::Team;
 // race module
 pub mod race;
 pub use race::{RaceRunState, RaceStateClientView};
+
+// event module
+pub mod event;
+pub use event::Event;

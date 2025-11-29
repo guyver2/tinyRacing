@@ -5,6 +5,7 @@ use std::io::{self};
 
 use crate::models::car::{Car, CarClientData, CarStats, CarStatus};
 use crate::models::driver::{Driver, DrivingStyle};
+use crate::models::event::{Event, EventData, EventType};
 use crate::models::team::Team;
 use crate::models::tire::{ClientTireData, Tire, TireType};
 use crate::models::track::Track;
@@ -58,6 +59,7 @@ pub struct RaceState {
     pub run_state: RaceRunState,
     pub tick_count: u64,
     pub tick_duration_seconds: f32,
+    pub events: Vec<Event>,
 }
 
 pub struct PitDecision {
@@ -66,19 +68,21 @@ pub struct PitDecision {
     pub fuel: Option<f32>,
 }
 
-
 fn is_ai_player(player_uuid: &Option<String>) -> bool {
     player_uuid.is_none()
 }
 
-
-pub fn ai_pit_decision(car: Car, track_wetness: f32, total_laps: u32) -> PitDecision{
+pub fn ai_pit_decision(car: Car, track_wetness: f32, total_laps: u32) -> PitDecision {
     // skip if not AI, already pitting or pitted
     if !is_ai_player(&car.player_uuid) || car.pit_request || car.status == CarStatus::Pit {
-        return PitDecision { pit: false, tire: None, fuel: None };
+        return PitDecision {
+            pit: false,
+            tire: None,
+            fuel: None,
+        };
     }
     let mut needs_pit = false;
-    if car.fuel < 90.0 {
+    if car.fuel < 99.0 {
         needs_pit = true;
     }
     let laps_remaining = total_laps.saturating_sub(car.lap);
@@ -99,26 +103,99 @@ pub fn ai_pit_decision(car: Car, track_wetness: f32, total_laps: u32) -> PitDeci
         }
     };
     // check if we need to change tire because of track condition change
-    if (matches!(best_tire, TireType::Intermediate | TireType::Wet) && matches!(car.tire.type_, TireType::Soft | TireType::Medium | TireType::Hard))
-    || (matches!(car.tire.type_, TireType::Intermediate | TireType::Wet) && matches!(best_tire, TireType::Soft | TireType::Medium | TireType::Hard)) {
+    if (matches!(best_tire, TireType::Intermediate | TireType::Wet)
+        && matches!(
+            car.tire.type_,
+            TireType::Soft | TireType::Medium | TireType::Hard
+        ))
+        || (matches!(car.tire.type_, TireType::Intermediate | TireType::Wet)
+            && matches!(
+                best_tire,
+                TireType::Soft | TireType::Medium | TireType::Hard
+            ))
+    {
         needs_pit = true;
     }
     if needs_pit {
-        println!("AI car {} requests pit: tire {:?}, fuel {:?}", car.number, best_tire, 100.0);
-        return PitDecision{ 
+        return PitDecision {
             pit: true,
             tire: Some(best_tire.clone()),
             fuel: Some(100.0),
-        }
+        };
     } else {
-        return PitDecision { pit: false, tire: None, fuel: None };
+        return PitDecision {
+            pit: false,
+            tire: None,
+            fuel: None,
+        };
     }
 }
 
+pub fn create_event(
+    event_id: u16,
+    time: f32,
+    event_type: EventType,
+    description: String,
+    car: Option<&Car>,
+) -> Event {
+    let event_data = EventData {
+        car_number: car.map(|c| c.number),
+        team_name: car.map(|c| c.team.name.clone()),
+        driver_name: car.map(|c| c.driver.name.clone()),
+        tire: car.and_then(|c| Some(format!("{:?}", c.tire.type_))),
+        fuel: car.and_then(|c| Some(c.fuel)),
+        weather: None,
+        time_offset_seconds: time,
+    };
 
-
+    Event {
+        id: event_id,
+        description,
+        event_type,
+        data: event_data,
+    }
+}
 
 impl RaceState {
+    /// Register a new event in the race state
+    pub fn register_event(
+        &mut self,
+        event_type: EventType,
+        description: String,
+        car: Option<&Car>,
+    ) {
+        let event_id = self.events.len() as u16;
+
+        let tire_str = if let Some(c) = car {
+            // For pit requests, use target_tire if available, otherwise current tire
+            c.target_tire
+                .as_ref()
+                .map(|t| format!("{:?}", t))
+                .or_else(|| Some(format!("{:?}", c.tire.type_)))
+        } else {
+            None
+        };
+
+        let event_data = EventData {
+            car_number: car.map(|c| c.number),
+            team_name: car.map(|c| c.team.name.clone()),
+            driver_name: car.map(|c| c.driver.name.clone()),
+            tire: tire_str,
+            fuel: car.and_then(|c| c.target_fuel),
+            weather: None,
+            time_offset_seconds: self.tick_count as f32 * self.tick_duration_seconds,
+        };
+
+        let event = Event {
+            id: event_id,
+            description,
+            event_type,
+            data: event_data,
+        };
+
+        self.events.push(event);
+    }
+
     pub fn load_race_config(config_path: &str) -> Result<RaceState, io::Error> {
         let mut cars = HashMap::new();
         let mut rng = rand::rng();
@@ -171,6 +248,7 @@ impl RaceState {
             run_state: RaceRunState::Paused, // Start paused
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
+            events: Vec::new(),
         })
     }
 
@@ -241,6 +319,7 @@ impl RaceState {
             run_state: RaceRunState::Paused, // Start paused
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
+            events: Vec::new(),
         }
     }
 
@@ -324,9 +403,6 @@ impl RaceState {
         self.track.wetness = self.track.wetness.clamp(0.0, 1.0);
     }
 
-    
-
-    
     pub fn update(&mut self) {
         if self.run_state != RaceRunState::Running && self.run_state != RaceRunState::LastLap {
             return; // Don't update if paused or finished
@@ -372,9 +448,38 @@ impl RaceState {
             // --- Handle AI input ---
             let decision = ai_pit_decision(car.clone(), self.track.wetness, self.track.laps);
             if decision.pit == true {
+                let was_requested = car.pit_request;
                 car.pit_request = true;
                 car.target_fuel = decision.fuel;
-                car.target_tire = decision.tire;
+                car.target_tire = decision.tire.clone();
+
+                // Register PitRequest event if this is a new request
+                if !was_requested {
+                    let tire_str = decision
+                        .tire
+                        .as_ref()
+                        .map(|t| format!("{:?}", t))
+                        .unwrap_or_else(|| "No change".to_string());
+                    let fuel_str = decision
+                        .fuel
+                        .map(|f| format!("{:.0}", f))
+                        .unwrap_or_else(|| "No refuel".to_string());
+                    let description = format!(
+                        "Car {} (AI) requests pit stop: {} tires, {} fuel",
+                        car.number, tire_str, fuel_str
+                    );
+
+                    // Create event data manually to avoid borrowing conflict
+                    let event_id = self.events.len() as u16;
+                    let event = create_event(
+                        event_id,
+                        self.tick_count as f32 * self.tick_duration_seconds,
+                        EventType::PitRequest,
+                        description,
+                        Some(&car),
+                    );
+                    self.events.push(event);
+                }
             }
 
             // --- Calculate Performance Factors (Only if Racing) ---
@@ -446,6 +551,33 @@ impl RaceState {
                     car.status = CarStatus::Pit;
                     car.pit_request = false;
                     car.pit_time_remaining = 50;
+
+                    // Register PitStop event
+                    let tire_str = car
+                        .target_tire
+                        .as_ref()
+                        .map(|t| format!("{:?}", t))
+                        .unwrap_or_else(|| "No change".to_string());
+                    let fuel_str = car
+                        .target_fuel
+                        .map(|f| format!("{:.0}", f))
+                        .unwrap_or_else(|| "No refuel".to_string());
+                    let description = format!(
+                        "Car {} enters pit stop: {} tires, {} fuel",
+                        car.number, tire_str, fuel_str
+                    );
+
+                    // Create event data manually to avoid borrowing conflict
+                    let event_id = self.events.len() as u16;
+                    let event = create_event(
+                        event_id,
+                        self.tick_count as f32 * self.tick_duration_seconds,
+                        EventType::PitStop,
+                        description,
+                        Some(&car),
+                    );
+                    self.events.push(event);
+
                     // println!("Car {} entering pits (Duration: {} ticks).", car.number, car.pit_time_remaining);
                     continue;
                 }

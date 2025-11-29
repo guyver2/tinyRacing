@@ -47,7 +47,7 @@ impl Weather {
 
     pub fn get_state_at_time(&self, time: f32) -> f32 {
         if self.state_change_time.is_empty() {
-            return 0.5; // Default to cloudy if no data
+            return 0.1; // Default to cloudy if no data
         }
 
         // If before first timepoint, return first value

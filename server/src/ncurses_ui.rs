@@ -36,9 +36,10 @@ struct UiState {
     last_command: String,
     last_command_result: String,
     current_input: String,
-    log_messages: Vec<String>, // For general logs
+    log_messages: Vec<String>, // For general logs and events
     input_history: Vec<String>,
     history_index: Option<usize>,
+    last_seen_event_count: usize, // Track how many events we've already displayed
 }
 
 impl UiState {
@@ -50,13 +51,14 @@ impl UiState {
             log_messages: Vec::new(),
             input_history: Vec::new(),
             history_index: None,
+            last_seen_event_count: 0,
         }
     }
 
     fn add_log(&mut self, message: String) {
         self.log_messages.push(message);
-        if self.log_messages.len() > 5 {
-            // Keep only last 5 logs for example
+        if self.log_messages.len() > 20 {
+            // Keep only last 20 logs/events
             self.log_messages.remove(0);
         }
     }
@@ -75,6 +77,15 @@ fn manual_or_auto_player(player_uuid: Option<&String>) -> String {
     } else {
         return "AI".to_string();
     }
+}
+
+/// Format time offset in seconds as [hh:mm:ss]
+fn format_time_offset(seconds: f32) -> String {
+    let total_seconds = seconds as u32;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let secs = total_seconds % 60;
+    format!("[{:02}:{:02}:{:02}]", hours, minutes, secs)
 }
 
 fn draw_ui(
@@ -416,9 +427,26 @@ pub fn ui_thread_main(
             }
         }
 
+        // 3. Check for new race events and add them to logs
+        {
+            let state_guard = shared_state_ui.lock().unwrap();
+            let events = &state_guard.events;
+            let new_events_count = events.len();
+
+            // Process any new events that we haven't seen yet
+            if new_events_count > ui_state.last_seen_event_count {
+                for event in events.iter().skip(ui_state.last_seen_event_count) {
+                    let time_prefix = format_time_offset(event.data.time_offset_seconds);
+                    let event_message = format!("{} {}", time_prefix, event.description);
+                    ui_state.add_log(event_message);
+                }
+                ui_state.last_seen_event_count = new_events_count;
+            }
+        }
+
         let tick_count = shared_state_ui.lock().unwrap().tick_count;
 
-        // 3. Draw UI
+        // 4. Draw UI
         draw_ui(
             &window,
             &current_race_view,
@@ -427,7 +455,7 @@ pub fn ui_thread_main(
             tick_count,
         );
 
-        // 4. Handle Input
+        // 5. Handle Input
         match window.getch() {
             Some(Input::Character(c)) => {
                 if c == '\n' {

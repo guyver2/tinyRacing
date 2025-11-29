@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
@@ -75,6 +75,39 @@ struct ApiResponse<T> {
     data: Option<T>,
 }
 
+// Custom deserializer for refuel that accepts both int and float (as number or string)
+fn deserialize_refuel<'de, D>(deserializer: D) -> Result<Option<f32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    let opt = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match opt {
+        Some(value) => {
+            match value {
+                serde_json::Value::Number(num) => {
+                    // Try to parse as f64 first (handles both int and float)
+                    if let Some(f) = num.as_f64() {
+                        Ok(Some(f as f32))
+                    } else {
+                        Err(Error::custom("Invalid number format for refuel"))
+                    }
+                }
+                serde_json::Value::String(s) => {
+                    // Try to parse string as a number
+                    match s.parse::<f32>() {
+                        Ok(f) if f >= 0.0 && f <= 100.0 => Ok(Some(f)),
+                        Ok(_) => Err(Error::custom("refuel must be between 0 and 100")),
+                        Err(_) => Err(Error::custom("refuel must be a number (int or float)")),
+                    }
+                }
+                _ => Err(Error::custom("refuel must be a number (int or float)")),
+            }
+        }
+        _none => Ok(None),
+    }
+}
+
 // Request DTOs
 #[derive(Deserialize)]
 struct DrivingStyleRequest {
@@ -84,6 +117,7 @@ struct DrivingStyleRequest {
 #[derive(Deserialize)]
 struct PitStopRequest {
     tires: Option<String>,
+    #[serde(deserialize_with = "deserialize_refuel")]
     refuel: Option<f32>,
 }
 

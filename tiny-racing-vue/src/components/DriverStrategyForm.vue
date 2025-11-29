@@ -137,13 +137,19 @@ function selectTire(type: string) {
   selectedTire.value = type;
 }
 
-function executePitStop() {
+async function executePitStop() {
   const requestOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tires: selectedTire.value, refuel: refuelAmount.value }),
+    body: JSON.stringify({ 
+      tires: selectedTire.value, 
+      refuel: Number(refuelAmount.value) 
+    }),
   };
-  fetch(`${API_URL}/cars/${props.car.car_number}/pit`, requestOptions);
+  const response = await fetch(`${API_URL}/cars/${props.car.car_number}/pit`, requestOptions);
+  if (response.ok) {
+    close();
+  }
 }
 
 function close() {

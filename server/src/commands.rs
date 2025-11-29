@@ -1,6 +1,7 @@
 use crate::models::car::CarStatus;
 use crate::models::driver::DrivingStyle;
-use crate::models::race::{RaceRunState, RaceState};
+use crate::models::event::EventType;
+use crate::models::race::{create_event, RaceRunState, RaceState};
 use crate::models::tire::TireType;
 use std::sync::{Arc, Mutex};
 
@@ -47,6 +48,7 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
             if state_guard.run_state == RaceRunState::Paused {
                 state_guard.run_state = RaceRunState::Running;
                 result_messages.push("Race started!".to_string());
+                state_guard.register_event(EventType::StartRace, "Race started!".to_string(), None);
             } else {
                 result_messages.push("Race is already running or finished.".to_string());
             }
@@ -62,6 +64,11 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
         ["stop"] => {
             state_guard.run_state = RaceRunState::Finished;
             result_messages.push("Race stopped/finished manually.".to_string());
+            state_guard.register_event(
+                EventType::EndRace,
+                "Race ended manually.".to_string(),
+                None,
+            );
         }
         ["order", car_num_str, style_str] => {
             if let Ok(car_num) = car_num_str.parse::<u32>() {
@@ -70,6 +77,15 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
                         "dnf" => {
                             car.status = CarStatus::Dnf;
                             result_messages.push(format!("Car {} set to DNF.", car_num));
+                            let cloned_car = car.clone();
+                            let event = create_event(
+                                state_guard.events.len() as u16,
+                                state_guard.tick_count as f32 * state_guard.tick_duration_seconds,
+                                EventType::Dnf,
+                                format!("Car {} set to DNF.", car_num),
+                                Some(&cloned_car),
+                            );
+                            state_guard.events.push(event);
                         }
                         "relax" => {
                             car.driving_style = DrivingStyle::Relax;
@@ -134,12 +150,33 @@ pub fn handle_command(command_str: String, state: SharedRaceState) -> String {
                 &mut result_messages,
             );
         }
+        ["nopit", car_num_str] => {
+            handle_nopit_command(car_num_str, &mut state_guard);
+        }
         ["pit", _car_num_str] => {
             result_messages.push(format!("Invalid pit command. Use: pit <car_number> [soft/medium/hard/intermediate/wet] [refuel <0-100>]"));
         }
         _ => result_messages.push(format!("Unknown command: {}", command_str.trim())),
     }
     result_messages.join("\\n")
+}
+
+fn handle_nopit_command(car_num_str: &str, state_guard: &mut RaceState) {
+    if let Ok(car_num) = car_num_str.parse::<u32>() {
+        // Check if car exists first
+        if !state_guard.cars.contains_key(&car_num) {
+            return;
+        }
+        state_guard.cars.get_mut(&car_num).unwrap().pit_request = false;
+        let event = create_event(
+            state_guard.events.len() as u16,
+            state_guard.tick_count as f32 * state_guard.tick_duration_seconds,
+            EventType::PitCancel,
+            format!("Car {} cancelled pit stop.", car_num),
+            Some(&state_guard.cars.get(&car_num).unwrap()),
+        );
+        state_guard.events.push(event);
+    }
 }
 
 fn handle_pit_command(
@@ -150,72 +187,102 @@ fn handle_pit_command(
     result_messages: &mut Vec<String>,
 ) {
     if let Ok(car_num) = car_num_str.parse::<u32>() {
-        if let Some(car) = state_guard.cars.get_mut(&car_num) {
-            // Process tire type if provided
-            let target_tire = if let Some(tire_str) = tire_str_opt {
-                match tire_str.to_lowercase().as_str() {
-                    "soft" => Some(TireType::Soft),
-                    "medium" => Some(TireType::Medium),
-                    "hard" => Some(TireType::Hard),
-                    "intermediate" | "inter" => Some(TireType::Intermediate),
-                    "wet" => Some(TireType::Wet),
-                    _ => {
-                        result_messages.push(format!("Invalid target tire type: {}", tire_str));
-                        return;
-                    }
+        // Process tire type if provided
+        let target_tire = if let Some(tire_str) = tire_str_opt {
+            match tire_str.to_lowercase().as_str() {
+                "soft" => Some(TireType::Soft),
+                "medium" => Some(TireType::Medium),
+                "hard" => Some(TireType::Hard),
+                "intermediate" | "inter" => Some(TireType::Intermediate),
+                "wet" => Some(TireType::Wet),
+                _ => {
+                    result_messages.push(format!("Invalid target tire type: {}", tire_str));
+                    return;
                 }
-            } else {
-                None
-            };
-
-            // Process fuel level if provided
-            let target_fuel = if let Some(fuel_str) = fuel_str_opt {
-                match fuel_str.parse::<f32>() {
-                    Ok(fuel) if fuel >= 0.0 && fuel <= 100.0 => Some(fuel),
-                    _ => {
-                        result_messages.push(format!(
-                            "Invalid target fuel level: {}. Must be 0-100.",
-                            fuel_str
-                        ));
-                        return;
-                    }
-                }
-            } else {
-                None
-            };
-
-            // Make sure at least one operation is being performed
-            if target_tire.is_none() && target_fuel.is_none() {
-                result_messages.push(
-                    "Pit stop request must specify at least tire change or refuel operation."
-                        .to_string(),
-                );
-                return;
             }
-
-            // Set pit request
-            car.pit_request = true;
-            car.target_tire = target_tire;
-            car.target_fuel = target_fuel;
-
-            // Format appropriate message based on operations
-            let tire_msg = match &car.target_tire {
-                Some(tire) => format!("Tire -> {:?}", tire),
-                _ => "No tire change".to_string(),
-            };
-
-            let fuel_msg = match car.target_fuel {
-                Some(fuel) => format!("Fuel -> {}%", fuel),
-                _ => "No refuel".to_string(),
-            };
-
-            result_messages.push(format!(
-                "Car {} queued for pit stop: {}, {}",
-                car_num, tire_msg, fuel_msg
-            ));
         } else {
-            result_messages.push(format!("Car number {} not found.", car_num));
+            None
+        };
+
+        // Process fuel level if provided
+        let target_fuel = if let Some(fuel_str) = fuel_str_opt {
+            match fuel_str.parse::<f32>() {
+                Ok(fuel) if fuel >= 0.0 && fuel <= 100.0 => Some(fuel),
+                _ => {
+                    result_messages.push(format!(
+                        "Invalid target fuel level: {}. Must be 0-100.",
+                        fuel_str
+                    ));
+                    return;
+                }
+            }
+        } else {
+            None
+        };
+
+        // Make sure at least one operation is being performed
+        if target_tire.is_none() && target_fuel.is_none() {
+            result_messages.push(
+                "Pit stop request must specify at least tire change or refuel operation."
+                    .to_string(),
+            );
+            return;
         }
+
+        // Check if car exists first
+        if !state_guard.cars.contains_key(&car_num) {
+            result_messages.push(format!("Car {} not found.", car_num));
+            return;
+        }
+
+        // Extract state values before mutable borrow (these are Copy types, so no borrow)
+        let tick_count = state_guard.tick_count;
+        let tick_duration = state_guard.tick_duration_seconds;
+
+        // Modify car and extract data
+        let car = state_guard.cars.get_mut(&car_num).unwrap();
+        car.pit_request = true;
+        car.target_tire = target_tire.clone();
+        car.target_fuel = target_fuel;
+
+        // Register PitRequest event
+        let tire_str = target_tire
+            .as_ref()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "No change".to_string());
+        let fuel_str = target_fuel
+            .map(|f| format!("{:.1}", f))
+            .unwrap_or_else(|| "No refuel".to_string());
+        let description = format!(
+            "Car {} (Player) requests pit stop: {} tires, {} fuel",
+            car_num, tire_str, fuel_str
+        );
+
+        // Create event data manually
+        let event = create_event(
+            state_guard.events.len() as u16,
+            tick_count as f32 * tick_duration,
+            EventType::PitRequest,
+            description,
+            Some(&state_guard.cars.get(&car_num).unwrap()),
+        );
+        state_guard.events.push(event);
+
+        // Format appropriate message based on operations
+        let tire_msg = match &target_tire {
+            Some(tire) => format!("Tire -> {:?}", tire),
+            _ => "No tire change".to_string(),
+        };
+
+        let fuel_msg = match target_fuel {
+            Some(fuel) => format!("Fuel -> {}%", fuel),
+            _ => "No refuel".to_string(),
+        };
+
+        result_messages.push(format!(
+            "Car {} queued for pit stop: {}, {}",
+            car_num, tire_msg, fuel_msg
+        ));
     } else {
         result_messages.push(format!("Invalid car number: {}", car_num_str));
     }

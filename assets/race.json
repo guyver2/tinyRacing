@@ -1,7 +1,7 @@
 {
     "track": {
        "name": "test",
-       "laps": 10
+       "laps": 50
     },
     "teams": [
          {
@@ -12,7 +12,7 @@
                 "logo": "red_bull_logo.png",
                 "pit_efficiency": 0.9
              },
-             "player_uuid": "123e4567-e89b-12d3-a456-426614174000",
+             "player_uuid": null,
              "driver_1": {
                 "name": "Max Verstappen",
                 "skill_level": 0.95,
