@@ -1,4 +1,8 @@
 use crate::commands;
+use crate::database::{
+    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_track_by_id,
+};
+use crate::database::{list_cars, list_drivers, list_players, list_teams, list_tracks};
 use crate::models::car::CarStatus;
 use crate::models::race::{RaceRunState, RaceState};
 use axum::{
@@ -9,9 +13,11 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Deserializer, Serialize};
+use sqlx::PgPool;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
+use uuid::Uuid;
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
@@ -54,7 +60,7 @@ struct PitStopEvent {
 #[derive(Clone, Debug, Serialize)]
 struct RaceFinishedEvent {
     winner: u32,
-    total_time: f64,
+    total_time: f32,
 }
 
 // API Error type
@@ -150,7 +156,7 @@ fn success<T>(data: Option<T>, message: Option<String>) -> Json<ApiResponse<T>> 
 }
 
 // Create the API Router
-pub fn create_api_router(race_state: SharedRaceState) -> Router {
+pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -> Router {
     // Create a channel for live updates
     let (tx, _) = broadcast::channel::<LiveEvent>(100);
 
@@ -161,22 +167,40 @@ pub fn create_api_router(race_state: SharedRaceState) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        // DB content routes
+        .route("/teams", get(get_teams))
+        .route("/drivers", get(get_drivers))
+        .route("/cars", get(get_cars))
+        .route("/tracks", get(get_tracks))
+        .route("/players", get(get_players))
+        .route("/teams/{team_id}", get(get_team))
+        .route("/drivers/{driver_id}", get(get_driver))
+        .route("/cars/{car_id}", get(get_car))
+        .route("/tracks/{track_id}", get(get_track))
+        .route("/players/{player_id}", get(get_player))
         // Race control routes
-        .route("/race", get(get_race_status))
-        .route("/race/start", post(start_race))
-        .route("/race/pause", post(pause_race))
-        .route("/race/stop", post(stop_race))
+        .route("/race/{race_id}", get(get_race_status))
+        .route("/race/{race_id}/start", post(start_race))
+        .route("/race/{race_id}/pause", post(pause_race))
+        .route("/race/{race_id}/stop", post(stop_race))
         // Car control routes
-        .route("/cars/{car_number}", get(get_car_status))
-        .route("/cars/{car_number}/driving-style", put(set_driving_style))
+        .route("/race/{race_id}/car/{car_number}", get(get_car_status))
+        .route(
+            "/race/{race_id}/car/{car_number}/driving-style",
+            put(set_driving_style),
+        )
         // Pit stop routes
-        .route("/cars/{car_number}/pit", post(request_pit_stop))
+        .route(
+            "/race/{race_id}/car/{car_number}/pit",
+            post(request_pit_stop),
+        )
         // Apply CORS middleware
         .layer(cors)
         // Share state across handlers
         .with_state(AppState {
             race_state,
             live_tx: tx,
+            db_pool,
         })
 }
 
@@ -185,14 +209,196 @@ pub fn create_api_router(race_state: SharedRaceState) -> Router {
 struct AppState {
     race_state: SharedRaceState,
     live_tx: broadcast::Sender<LiveEvent>,
+    db_pool: Option<PgPool>,
 }
 
 // Route handler implementations
 
+// ========== Database Content Getters ==========
+
+// Get all teams
+async fn get_teams(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::TeamDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let teams = list_teams(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?;
+
+    Ok(success(Some(teams), None))
+}
+
+// Get a single team by ID
+async fn get_team(
+    Path(team_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<crate::database::TeamDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&team_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
+
+    let team = get_team_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Team with ID {} not found", team_id)))?;
+
+    Ok(success(Some(team), None))
+}
+
+// Get all drivers
+async fn get_drivers(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::DriverDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let drivers = list_drivers(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
+
+    Ok(success(Some(drivers), None))
+}
+
+// Get a single driver by ID
+async fn get_driver(
+    Path(driver_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<crate::database::DriverDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&driver_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
+
+    let driver = get_driver_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
+
+    Ok(success(Some(driver), None))
+}
+
+// Get all cars
+async fn get_cars(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::CarDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let cars = list_cars(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch cars: {}", e)))?;
+
+    Ok(success(Some(cars), None))
+}
+
+// Get a single car by ID
+async fn get_car(
+    Path(car_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<crate::database::CarDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&car_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id)))?;
+
+    let car = get_car_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id)))?;
+
+    Ok(success(Some(car), None))
+}
+
+// Get all tracks
+async fn get_tracks(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::TrackDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let tracks = list_tracks(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch tracks: {}", e)))?;
+
+    Ok(success(Some(tracks), None))
+}
+
+// Get a single track by ID
+async fn get_track(
+    Path(track_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<crate::database::TrackDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&track_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid track ID format: {}", track_id)))?;
+
+    let track = get_track_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch track: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Track with ID {} not found", track_id)))?;
+
+    Ok(success(Some(track), None))
+}
+
+// Get all players
+async fn get_players(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::PlayerDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let players = list_players(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch players: {}", e)))?;
+
+    Ok(success(Some(players), None))
+}
+
+// Get a single player by ID
+async fn get_player(
+    Path(player_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<crate::database::PlayerDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&player_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid player ID format: {}", player_id)))?;
+
+    let player = get_player_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch player: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Player with ID {} not found", player_id)))?;
+
+    Ok(success(Some(player), None))
+}
+
+// ========== Race Control Handlers ==========
+
 // Get race status
 async fn get_race_status(
+    Path(race_id): Path<u32>,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<RaceStatusResponse>>> {
+    assert_eq!(race_id, 1);
     let race_state = state
         .race_state
         .lock()
@@ -241,7 +447,11 @@ async fn get_race_status(
 }
 
 // Start race
-async fn start_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse<()>>> {
+async fn start_race(
+    Path(race_id): Path<u32>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    assert_eq!(race_id, 1);
     let result = commands::handle_command("start".to_string(), state.race_state.clone());
 
     // Broadcast race update event
@@ -251,7 +461,11 @@ async fn start_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse
 }
 
 // Pause race
-async fn pause_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse<()>>> {
+async fn pause_race(
+    Path(race_id): Path<u32>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    assert_eq!(race_id, 1);
     let result = commands::handle_command("pause".to_string(), state.race_state.clone());
 
     // Broadcast race update event
@@ -261,7 +475,11 @@ async fn pause_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse
 }
 
 // Stop race
-async fn stop_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse<()>>> {
+async fn stop_race(
+    Path(race_id): Path<u32>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    assert_eq!(race_id, 1);
     let result = commands::handle_command("stop".to_string(), state.race_state.clone());
 
     // Broadcast race finished event
@@ -277,9 +495,10 @@ async fn stop_race(State(state): State<AppState>) -> ApiResult<Json<ApiResponse<
 
 // Get car status
 async fn get_car_status(
-    Path(car_number): Path<u32>,
+    Path((race_id, car_number)): Path<(u32, u32)>,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<CarStatusResponse>>> {
+    assert_eq!(race_id, 1);
     let race_state = state
         .race_state
         .lock()
@@ -308,10 +527,11 @@ async fn get_car_status(
 
 // Set driving style
 async fn set_driving_style(
-    Path(car_number): Path<u32>,
+    Path((race_id, car_number)): Path<(u32, u32)>,
     State(state): State<AppState>,
     Json(request): Json<DrivingStyleRequest>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
+    assert_eq!(race_id, 1);
     let command = format!("order {} {}", car_number, request.style);
     let result = commands::handle_command(command, state.race_state.clone());
 
@@ -323,10 +543,11 @@ async fn set_driving_style(
 
 // Request pit stop
 async fn request_pit_stop(
-    Path(car_number): Path<u32>,
+    Path((race_id, car_number)): Path<(u32, u32)>,
     State(state): State<AppState>,
     Json(request): Json<PitStopRequest>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
+    assert_eq!(race_id, 1);
     // Clone the values we'll need multiple times
     let tires_clone = request.tires.clone();
     let refuel_clone = request.refuel;
@@ -381,9 +602,9 @@ fn find_winner(race_state: &SharedRaceState) -> Option<u32> {
 }
 
 // Get the current race time
-fn get_race_time(race_state: &SharedRaceState) -> Option<f64> {
+fn get_race_time(race_state: &SharedRaceState) -> Option<f32> {
     if let Ok(state) = race_state.lock() {
-        Some(state.tick_count as f64 * 0.1) // Convert ticks to seconds
+        Some(state.tick_count as f32 * state.tick_duration_seconds) // Convert ticks to seconds
     } else {
         None
     }

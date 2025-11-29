@@ -21,6 +21,8 @@ use crate::commands::*;
 mod ncurses_ui;
 use crate::ncurses_ui::*;
 
+mod database;
+use crate::database::init_from_env;
 mod api;
 
 // Type alias for the shared state used across threads/tasks
@@ -167,9 +169,12 @@ async fn main() {
             // Clone the race state for the API server
             let api_race_state = shared_state.clone();
 
+            // Initialize database connection
+            let db_pool = init_from_env().await;
+
             // Start the API server in a separate task
             tokio::spawn(async move {
-                let app = api::create_api_router(api_race_state);
+                let app = api::create_api_router(api_race_state, db_pool);
 
                 let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
                 tracing::info!("API server listening on http://localhost:3000");

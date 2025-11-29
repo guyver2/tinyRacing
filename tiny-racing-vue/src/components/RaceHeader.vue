@@ -18,6 +18,7 @@
 import { computed } from 'vue';
 
 const API_URL = 'http://localhost:3000';
+const RACE_ID = 1;
 
 const props = defineProps<{
   trackName: string;
@@ -53,9 +54,9 @@ function startStopRace() {
   };
   let endpoint = '';
   if (props.raceStatus === "Paused") {
-    endpoint = '/race/start';
+    endpoint = `/race/${RACE_ID}/start`;
   } else if (props.raceStatus === "Running") {
-    endpoint = '/race/pause';
+    endpoint = `/race/${RACE_ID}/pause`;
   }
   fetch(`${API_URL}${endpoint}`, requestOptions); // Placeholder for starting/stopping
 }

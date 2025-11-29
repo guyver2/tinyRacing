@@ -109,6 +109,7 @@ import { ref } from 'vue';
 import type { Car } from '@/types';
 
 const API_URL = 'http://localhost:3000';
+const RACE_ID = 1;
 
 const props = defineProps<{
   car: Car;
@@ -130,7 +131,7 @@ function selectDrivingStyle(style: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ style: style }),
   };
-  fetch(`${API_URL}/cars/${props.car.car_number}/driving-style`, requestOptions);
+  fetch(`${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/driving-style`, requestOptions);
 }
 
 function selectTire(type: string) {
@@ -146,7 +147,7 @@ async function executePitStop() {
       refuel: Number(refuelAmount.value) 
     }),
   };
-  const response = await fetch(`${API_URL}/cars/${props.car.car_number}/pit`, requestOptions);
+  const response = await fetch(`${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/pit`, requestOptions);
   if (response.ok) {
     close();
   }
