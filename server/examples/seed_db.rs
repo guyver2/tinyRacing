@@ -439,10 +439,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connecting to database...");
     let db = Database::new(&database_url).await?;
 
-    println!("Running migrations...");
-    db.migrate().await?;
-    println!("Migrations completed!");
-
     // Seed tracks first (no dependencies)
     println!("\n=== Seeding Tracks ===");
     for track in TRACKS {

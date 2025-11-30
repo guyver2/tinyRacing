@@ -3,6 +3,7 @@
 # Variables
 VUE_DIR=tiny-racing-vue
 CARGO_DIR=server
+DATABASE_URL=postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing
 
 .PHONY: help db-up db-down db-shell run-sim run-vue seed-db
 
@@ -28,11 +29,20 @@ db-up:
 db-down:
 	docker compose down
 
+db-migrate:
+	cd $(CARGO_DIR) && cargo run --example run_migrations
+
+db-migrate-down:
+	cd $(CARGO_DIR) && cargo run --example run_migrations down
+
 db-shell:
 	docker exec -it tiny_racing_db psql -U $(DB_USER) -d $(DB_NAME)
 
 db-seed:
 	cd $(CARGO_DIR) && cargo run --example seed_db
+
+db-export-sqlx:
+	cd $(CARGO_DIR) && cargo sqlx prepare --database-url $(DATABASE_URL)
 
 run-sim:
 	cd $(CARGO_DIR) && cargo run -- ../assets/race.json
