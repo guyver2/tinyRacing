@@ -26,7 +26,7 @@
           :key="car.car_number"
           :class="getRowClasses(car)"
           @click="selectCar(car)"
-          :style="{'background-color': car.team.color}"
+          :style="{ 'background-color': car.team.color }"
         >
           <td v-if="!collapsed" :class="{ 'top-3': car.race_position <= 3 }">
             {{ car.race_position }}
@@ -102,7 +102,6 @@ function selectCar(car: Car) {
 function closeStrategyForm() {
   selectedCar.value = null;
 }
-
 </script>
 
 <style scoped>

@@ -53,7 +53,6 @@ const connectWebSocket = () => {
   });
 };
 
-
 // Initialize connection
 connectWebSocket();
 

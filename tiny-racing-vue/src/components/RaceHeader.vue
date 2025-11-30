@@ -4,7 +4,8 @@
       Race: <span>{{ trackName }}</span> Time elapsed: <span>{{ formattedElapsedTime }}</span>
     </div>
     <div class="race-status">
-      Status: <button @click="startStopRace">{{ raceStatus }}</button> Lap: <span>{{ currentLap }}</span
+      Status: <button @click="startStopRace">{{ raceStatus }}</button> Lap:
+      <span>{{ currentLap }}</span
       >/<span>{{ totalLaps }}</span>
     </div>
     <div class="weather-container">
@@ -45,22 +46,20 @@ const formattedElapsedTime = computed(() => {
   }
 });
 
-
 function startStopRace() {
   const requestOptions = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "",
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '',
   };
   let endpoint = '';
-  if (props.raceStatus === "Paused") {
+  if (props.raceStatus === 'Paused') {
     endpoint = `/race/${RACE_ID}/start`;
-  } else if (props.raceStatus === "Running") {
+  } else if (props.raceStatus === 'Running') {
     endpoint = `/race/${RACE_ID}/pause`;
   }
   fetch(`${API_URL}${endpoint}`, requestOptions); // Placeholder for starting/stopping
 }
-
 </script>
 
 <style scoped>

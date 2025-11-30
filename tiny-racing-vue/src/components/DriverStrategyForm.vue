@@ -127,8 +127,8 @@ const refuelAmount = ref(100);
 function selectDrivingStyle(style: string) {
   selectedStyle.value = style;
   const requestOptions = {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ style: style }),
   };
   fetch(`${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/driving-style`, requestOptions);
@@ -140,14 +140,17 @@ function selectTire(type: string) {
 
 async function executePitStop() {
   const requestOptions = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      tires: selectedTire.value, 
-      refuel: Number(refuelAmount.value) 
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tires: selectedTire.value,
+      refuel: Number(refuelAmount.value),
     }),
   };
-  const response = await fetch(`${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/pit`, requestOptions);
+  const response = await fetch(
+    `${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/pit`,
+    requestOptions,
+  );
   if (response.ok) {
     close();
   }

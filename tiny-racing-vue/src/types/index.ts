@@ -12,12 +12,12 @@ export interface Team {
 
 export interface Driver {
   name: string;
-  skill_level: number,
-  stamina: number, 
-  weather_tolerance: number, 
-  experience: number, 
-  consistency: number,
-  focus: number,
+  skill_level: number;
+  stamina: number;
+  weather_tolerance: number;
+  experience: number;
+  consistency: number;
+  focus: number;
 }
 
 export interface Car {

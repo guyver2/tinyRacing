@@ -9,8 +9,6 @@ import { useRaceData } from '../services/WebSocketService';
 
 const { raceState, connected } = useRaceData();
 const isCarTableCollapsed = ref(true);
-
-
 </script>
 
 <template>
@@ -30,10 +28,7 @@ const isCarTableCollapsed = ref(true);
       <div class="game-content">
         <div class="sidebar" :class="{ expanded: !isCarTableCollapsed }">
           <div class="cars-table-container">
-            <CarsTable
-              :cars="raceState.cars"
-              v-model:collapsed="isCarTableCollapsed"
-            />
+            <CarsTable :cars="raceState.cars" v-model:collapsed="isCarTableCollapsed" />
           </div>
         </div>
 
