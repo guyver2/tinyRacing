@@ -1,13 +1,15 @@
+use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
 use crate::commands;
 use crate::database::{
     get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_track_by_id,
 };
 use crate::database::{list_cars, list_drivers, list_players, list_teams, list_tracks};
+use crate::database::{LoginRequest, LoginResponse, RegisterRequest};
 use crate::models::car::CarStatus;
 use crate::models::race::{RaceRunState, RaceState};
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post, put},
     Json, Router,
@@ -65,10 +67,11 @@ struct RaceFinishedEvent {
 
 // API Error type
 #[derive(Debug)]
-enum ApiError {
+pub enum ApiError {
     NotFound(String),
     BadRequest(String),
     InternalError(String),
+    Unauthorized(String),
 }
 
 // API Response and Error implementations
@@ -134,6 +137,7 @@ impl IntoResponse for ApiError {
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
             ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
             ApiError::InternalError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            ApiError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
         };
 
         let body = Json(ApiResponse::<()> {
@@ -167,6 +171,10 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .allow_headers(Any);
 
     Router::new()
+        // Authentication routes (public)
+        .route("/auth/login", post(login))
+        .route("/auth/register", post(register))
+        .route("/auth/logout", post(logout))
         // DB content routes
         .route("/teams", get(get_teams))
         .route("/drivers", get(get_drivers))
@@ -389,6 +397,122 @@ async fn get_player(
         .ok_or_else(|| ApiError::NotFound(format!("Player with ID {} not found", player_id)))?;
 
     Ok(success(Some(player), None))
+}
+
+// Login endpoint
+async fn login(
+    State(state): State<AppState>,
+    Json(request): Json<LoginRequest>,
+) -> ApiResult<Json<ApiResponse<LoginResponse>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Authenticate user
+    let (player_id, token) = authenticate_user(pool, &request.username, &request.password)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidCredentials => {
+                ApiError::Unauthorized("Invalid username or password".to_string())
+            }
+            AuthError::DatabaseError(msg) => ApiError::InternalError(msg),
+            _ => ApiError::InternalError("Authentication failed".to_string()),
+        })?;
+
+    // Store token in database
+    let jwt_token = store_token(pool, player_id, &token)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to store token: {}", e)))?;
+
+    let response = LoginResponse {
+        token,
+        expires_at: jwt_token.expires_at,
+    };
+
+    Ok(success(
+        Some(response),
+        Some("Login successful".to_string()),
+    ))
+}
+
+// Register endpoint
+async fn register(
+    State(state): State<AppState>,
+    Json(request): Json<RegisterRequest>,
+) -> ApiResult<Json<ApiResponse<crate::database::PlayerDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Check if username already exists
+    let existing_player = crate::database::get_player_by_username(pool, &request.username)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to check username: {}", e)))?;
+
+    if existing_player.is_some() {
+        return Err(ApiError::BadRequest("Username already exists".to_string()));
+    }
+
+    // Hash password
+    let password_hash = hash_password(&request.password)
+        .map_err(|e| ApiError::InternalError(format!("Failed to hash password: {}", e)))?;
+
+    // Create player with password hash
+    let player = sqlx::query_as::<_, crate::database::PlayerDb>(
+        r#"
+        INSERT INTO player (username, email, password_hash)
+        VALUES ($1, $2, $3)
+        RETURNING *
+        "#,
+    )
+    .bind(&request.username)
+    .bind(&request.email)
+    .bind(&password_hash)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+            ApiError::BadRequest("Username already exists".to_string())
+        } else {
+            ApiError::InternalError(format!("Failed to create player: {}", e))
+        }
+    })?;
+
+    Ok(success(
+        Some(player),
+        Some("Registration successful".to_string()),
+    ))
+}
+
+// Logout endpoint
+async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| ApiError::Unauthorized("Missing authorization header".to_string()))?;
+
+    // Extract token from "Bearer <token>" format
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| ApiError::Unauthorized("Invalid authorization header format".to_string()))?;
+
+    // Delete token from database
+    delete_token(pool, token)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to delete token: {}", e)))?;
+
+    Ok(success(None, Some("Logout successful".to_string())))
 }
 
 // ========== Race Control Handlers ==========

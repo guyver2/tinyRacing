@@ -107,8 +107,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { Car } from '@/types';
+import { apiRequest } from '@/services/ApiService';
 
-const API_URL = 'http://localhost:3000';
 const RACE_ID = 1;
 
 const props = defineProps<{
@@ -124,14 +124,12 @@ const selectedStyle = ref(props.car.driving_style);
 const selectedTire = ref<string | null>(null);
 const refuelAmount = ref(100);
 
-function selectDrivingStyle(style: string) {
+async function selectDrivingStyle(style: string) {
   selectedStyle.value = style;
-  const requestOptions = {
+  await apiRequest(`/race/${RACE_ID}/car/${props.car.car_number}/driving-style`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ style: style }),
-  };
-  fetch(`${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/driving-style`, requestOptions);
+  });
 }
 
 function selectTire(type: string) {
@@ -139,18 +137,13 @@ function selectTire(type: string) {
 }
 
 async function executePitStop() {
-  const requestOptions = {
+  const response = await apiRequest(`/race/${RACE_ID}/car/${props.car.car_number}/pit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       tires: selectedTire.value,
       refuel: Number(refuelAmount.value),
     }),
-  };
-  const response = await fetch(
-    `${API_URL}/race/${RACE_ID}/car/${props.car.car_number}/pit`,
-    requestOptions,
-  );
+  });
   if (response.ok) {
     close();
   }

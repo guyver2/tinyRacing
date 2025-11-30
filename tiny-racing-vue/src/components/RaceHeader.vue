@@ -17,8 +17,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { apiRequest } from '@/services/ApiService';
 
-const API_URL = 'http://localhost:3000';
 const RACE_ID = 1;
 
 const props = defineProps<{
@@ -46,19 +46,20 @@ const formattedElapsedTime = computed(() => {
   }
 });
 
-function startStopRace() {
-  const requestOptions = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: '',
-  };
+async function startStopRace() {
   let endpoint = '';
   if (props.raceStatus === 'Paused') {
     endpoint = `/race/${RACE_ID}/start`;
   } else if (props.raceStatus === 'Running') {
     endpoint = `/race/${RACE_ID}/pause`;
   }
-  fetch(`${API_URL}${endpoint}`, requestOptions); // Placeholder for starting/stopping
+
+  if (endpoint) {
+    await apiRequest(endpoint, {
+      method: 'POST',
+      body: '',
+    });
+  }
 }
 </script>
 

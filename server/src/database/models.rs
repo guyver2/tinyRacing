@@ -73,6 +73,19 @@ pub struct PlayerDb {
     pub id: Uuid,
     pub username: String,
     pub email: Option<String>,
+    #[serde(skip_serializing)]
+    pub password_hash: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+// Database representation of a JWT Token
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct JwtTokenDb {
+    pub id: Uuid,
+    pub player_id: Uuid,
+    pub token: String,
+    pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -130,4 +143,23 @@ pub struct CreateTrackRequest {
 pub struct CreatePlayerRequest {
     pub username: String,
     pub email: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: Option<String>,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub expires_at: DateTime<Utc>,
 }

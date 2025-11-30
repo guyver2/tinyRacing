@@ -24,6 +24,8 @@ use crate::ncurses_ui::*;
 mod database;
 use crate::database::init_from_env;
 mod api;
+mod auth;
+mod auth_middleware;
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
