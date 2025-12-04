@@ -12,6 +12,7 @@ pub struct TeamDb {
     pub logo: String,
     pub color: String,
     pub pit_efficiency: f32,
+    pub player_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -98,6 +99,7 @@ pub struct CreateTeamRequest {
     pub logo: String,
     pub color: String,
     pub pit_efficiency: f32,
+    pub player_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

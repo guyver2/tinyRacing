@@ -3,12 +3,12 @@ use crate::commands;
 use crate::database::{
     get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_track_by_id,
 };
-use crate::database::{list_cars, list_drivers, list_players, list_teams, list_tracks};
+use crate::database::{list_cars, list_drivers, list_players, list_teams, list_teams_by_player, list_tracks};
 use crate::database::{LoginRequest, LoginResponse, RegisterRequest};
 use crate::models::car::CarStatus;
 use crate::models::race::{RaceRunState, RaceState};
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post, put},
@@ -130,6 +130,11 @@ struct PitStopRequest {
     refuel: Option<f32>,
 }
 
+#[derive(Deserialize)]
+struct TeamQueryParams {
+    player_id: Option<String>,
+}
+
 // Implementation of response conversion for ApiError
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
@@ -186,6 +191,22 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .route("/cars/{car_id}", get(get_car))
         .route("/tracks/{track_id}", get(get_track))
         .route("/players/{player_id}", get(get_player))
+        // create routes
+        // .route("/teams", post(create_team))
+        // .route("/drivers", post(create_driver))
+        // .route("/cars", post(create_car))
+        // .route("/tracks", post(create_track))
+        //.route("/players", post(create_player)) // players are created through register
+        // update routes
+        // .route("/teams/{team_id}", put(update_team))
+        // .route("/drivers/{driver_id}", put(update_driver))
+        // .route("/cars/{car_id}", put(update_car))
+        // .route("/tracks/{track_id}", put(update_track))
+        // delete routes
+        // .route("/teams/{team_id}", delete(delete_team))
+        // .route("/drivers/{driver_id}", delete(delete_driver))
+        // .route("/cars/{car_id}", delete(delete_car))
+        // .route("/tracks/{track_id}", delete(delete_track))
         // Race control routes
         .route("/race/{race_id}", get(get_race_status))
         .route("/race/{race_id}/start", post(start_race))
@@ -224,17 +245,27 @@ struct AppState {
 
 // ========== Database Content Getters ==========
 
-// Get all teams
+// Get all teams (optionally filtered by player_id)
 async fn get_teams(
     State(state): State<AppState>,
+    Query(params): Query<TeamQueryParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::TeamDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let teams = list_teams(pool)
-        .await
-        .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?;
+    
+    let teams = if let Some(player_id_str) = params.player_id {
+        let player_id = Uuid::parse_str(&player_id_str)
+            .map_err(|_| ApiError::BadRequest(format!("Invalid player ID format: {}", player_id_str)))?;
+        list_teams_by_player(pool, player_id)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
+    } else {
+        list_teams(pool)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
+    };
 
     Ok(success(Some(teams), None))
 }

@@ -5,7 +5,7 @@ VUE_DIR=tiny-racing-vue
 CARGO_DIR=server
 DATABASE_URL=postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing
 
-.PHONY: help db-up db-down db-shell run-sim run-vue seed-db
+.PHONY: help db-up db-down db-shell run-sim run-vue seed-db db-wipe
 
 help:
 	@echo "Available make targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  db-down       Stop and remove PostgreSQL Docker container"
 	@echo "  db-shell      psql shell into the running database"
 	@echo "  db-seed       Seed the database using the seed script"
+	@echo "  db-wipe       Delete all database content (tables, schema, everything)"
 	@echo "  run-sim       Start the Rust backend"
 	@echo "  run-vue       Start the Vue.js frontend"
 	@echo "  format        Format the code using prettier and cargo fmt"
@@ -40,6 +41,13 @@ db-shell:
 
 db-seed:
 	cd $(CARGO_DIR) && cargo run --example seed_db
+
+db-wipe:
+	@echo "⚠️  WARNING: This will delete ALL database content (tables, schemas, everything)!"
+	@echo -n "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
+	docker exec -i tiny_racing_db psql -U tiny_racing -d postgres -c "DROP DATABASE IF EXISTS tiny_racing;"
+	docker exec -i tiny_racing_db psql -U tiny_racing -d postgres -c "CREATE DATABASE tiny_racing OWNER tiny_racing;"
+	@echo "✅ Database wiped successfully. Run 'make db-migrate' to recreate the schema."
 
 db-export-sqlx:
 	cd $(CARGO_DIR) && cargo sqlx prepare --database-url $(DATABASE_URL)

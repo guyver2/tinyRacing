@@ -232,13 +232,9 @@ pub async fn run_migration_up(pool: &PgPool, migration: &Migration) -> Result<()
 
     let start = SystemTime::now();
 
-    // Execute the migration (split by semicolons to handle multiple statements)
-    for statement in sql.split(';') {
-        let statement = statement.trim();
-        if !statement.is_empty() {
-            sqlx::query(statement).execute(pool).await?;
-        }
-    }
+    // Execute the entire migration SQL as a batch
+    // Note: Using raw SQL execution to properly handle functions with $$ delimiters
+    sqlx::raw_sql(&sql).execute(pool).await?;
 
     let execution_time = start
         .elapsed()
@@ -296,13 +292,9 @@ pub async fn run_migration_down(
         )));
     }
 
-    // Execute the down migration (split by semicolons to handle multiple statements)
-    for statement in down_sql.split(';') {
-        let statement = statement.trim();
-        if !statement.is_empty() {
-            sqlx::query(statement).execute(pool).await?;
-        }
-    }
+    // Execute the entire down migration SQL as a batch
+    // Note: Using raw SQL execution to properly handle functions with $$ delimiters
+    sqlx::raw_sql(&down_sql).execute(pool).await?;
 
     // Remove the migration record
     sqlx::query("DELETE FROM _sqlx_migrations WHERE version = $1")

@@ -5,20 +5,19 @@ use uuid::Uuid;
 // ========== Team Queries ==========
 
 pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<TeamDb, sqlx::Error> {
-    let team = sqlx::query_as!(
+    let team = sqlx::query_as::<_, TeamDb>(
         // this query check against the database schema for the correct types at compile time query_as!
-        TeamDb,
         r#"
-        INSERT INTO team (number, name, logo, color, pit_efficiency)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO team (number, name, logo, color, pit_efficiency, player_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-        "#,
-        request.number,
-        request.name,
-        request.logo,
-        request.color,
-        request.pit_efficiency
-    )
+        "#)
+    .bind(request.number)
+    .bind(request.name)
+    .bind(request.logo)
+    .bind(request.color)
+    .bind(request.pit_efficiency)
+    .bind(request.player_id)
     .fetch_one(pool)
     .await?;
 
@@ -51,6 +50,15 @@ pub async fn list_teams(pool: &PgPool) -> Result<Vec<TeamDb>, sqlx::Error> {
     Ok(teams)
 }
 
+pub async fn list_teams_by_player(pool: &PgPool, player_id: Uuid) -> Result<Vec<TeamDb>, sqlx::Error> {
+    let teams = sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 ORDER BY number")
+        .bind(player_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(teams)
+}
+
 pub async fn update_team(
     pool: &PgPool,
     id: Uuid,
@@ -59,7 +67,7 @@ pub async fn update_team(
     let team = sqlx::query_as::<_, TeamDb>(
         r#"
         UPDATE team
-        SET number = $2, name = $3, logo = $4, color = $5, pit_efficiency = $6, updated_at = NOW()
+        SET number = $2, name = $3, logo = $4, color = $5, pit_efficiency = $6, player_id = $7, updated_at = NOW()
         WHERE id = $1
         RETURNING *
         "#,
@@ -70,6 +78,7 @@ pub async fn update_team(
     .bind(request.logo)
     .bind(request.color)
     .bind(request.pit_efficiency)
+    .bind(request.player_id)
     .fetch_one(pool)
     .await?;
 
