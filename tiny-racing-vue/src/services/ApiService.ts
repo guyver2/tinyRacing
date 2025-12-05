@@ -148,3 +148,183 @@ export async function logout(): Promise<void> {
   // Always remove token from local storage
   removeToken();
 }
+
+// Get player ID from JWT token
+export function getPlayerId(): string | null {
+  const token = getToken();
+  if (!token || isTokenExpired()) {
+    return null;
+  }
+
+  try {
+    // Decode JWT token (base64url decode the payload)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    // Decode the payload (second part)
+    const payload = parts[1];
+    // Add padding if needed
+    const paddedPayload = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+    const decoded = atob(paddedPayload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(decoded);
+    
+    return claims.sub || null;
+  } catch (err) {
+    console.error('Error decoding token:', err);
+    return null;
+  }
+}
+
+// Team interfaces
+export interface TeamDb {
+  id: string;
+  number: number;
+  name: string;
+  logo: string;
+  color: string;
+  pit_efficiency: number;
+  player_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTeamRequest {
+  number?: number;
+  name: string;
+  logo: string;
+  color: string;
+  pit_efficiency?: number;
+  player_id?: string | null;
+}
+
+export interface ApiResponse<T> {
+  status: string;
+  message?: string;
+  data?: T;
+}
+
+// Get teams (optionally filtered by player_id)
+export async function getTeams(playerId?: string): Promise<TeamDb[]> {
+  const url = playerId ? `/teams?player_id=${playerId}` : '/teams';
+  const response = await apiRequest(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch teams: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TeamDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch teams');
+}
+
+// Get the current player's team
+export async function getMyTeam(): Promise<TeamDb | null> {
+  const response = await apiRequest('/teams/my');
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('You must be logged in to view your team');
+    }
+    throw new Error(`Failed to fetch team: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TeamDb | null> = await response.json();
+  if (data.status === 'success') {
+    return data.data || null;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch team');
+}
+
+// Create a new team
+export async function createTeam(request: CreateTeamRequest): Promise<TeamDb> {
+  const response = await apiRequest('/teams', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to create team: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TeamDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to create team');
+}
+
+// Driver interfaces
+export interface DriverDb {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  nationality: string;
+  gender: string;
+  skill_level: number;
+  stamina: number;
+  weather_tolerance: number;
+  experience: number;
+  consistency: number;
+  focus: number;
+  team_id: string | null;
+  car_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Car interfaces
+export interface CarDb {
+  id: string;
+  number: number;
+  team_id: string | null;
+  handling: number;
+  acceleration: number;
+  top_speed: number;
+  reliability: number;
+  fuel_consumption: number;
+  tire_wear: number;
+  base_performance: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Get unassigned drivers (for market)
+export async function getUnassignedDrivers(): Promise<DriverDb[]> {
+  const response = await apiRequest('/drivers/unassigned');
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch unassigned drivers: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<DriverDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch unassigned drivers');
+}
+
+// Get unassigned cars (for market)
+export async function getUnassignedCars(): Promise<CarDb[]> {
+  const response = await apiRequest('/cars/unassigned');
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch unassigned cars: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<CarDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch unassigned cars');
+}

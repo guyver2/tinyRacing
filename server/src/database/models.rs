@@ -94,11 +94,13 @@ pub struct JwtTokenDb {
 // Request/Response DTOs for creating entities
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTeamRequest {
-    pub number: i32,
+    #[serde(default)]
+    pub number: Option<i32>,
     pub name: String,
     pub logo: String,
     pub color: String,
-    pub pit_efficiency: f32,
+    #[serde(default)]
+    pub pit_efficiency: Option<f32>,
     pub player_id: Option<Uuid>,
 }
 
@@ -145,6 +147,7 @@ pub struct CreateTrackRequest {
 pub struct CreatePlayerRequest {
     pub username: String,
     pub email: Option<String>,
+    pub password: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

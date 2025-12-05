@@ -56,7 +56,6 @@ import { register } from '@/services/ApiService';
 
 const emit = defineEmits<{
   registerSuccess: [];
-  close: [];
 }>();
 
 const username = ref('');
@@ -91,9 +90,8 @@ async function handleRegister() {
 
     if (response.status === 'success') {
       success.value = 'Registration successful! You can now login.';
-      // Auto-close after 2 seconds
+      // Auto-switch to login after 2 seconds
       setTimeout(() => {
-        emit('close');
         emit('registerSuccess');
       }, 2000);
     } else {
@@ -113,8 +111,7 @@ async function handleRegister() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  background-color: #f0f5f9;
+  width: 100%;
 }
 
 .register-form {

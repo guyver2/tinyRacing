@@ -1,11 +1,17 @@
 // Standalone program to seed the database with initial data
 // Run with: cargo run --example seed_db
+// Run with randomization: cargo run --example seed_db -- randomize
 //
 // This program seeds the database with static hardcoded data for:
 // - Teams, drivers, and cars (decoupled - can add unassigned drivers/cars)
 // - Tracks
+// When "randomize" parameter is passed, also generates random unassigned cars and drivers
 
 use chrono::NaiveDate;
+use fake::Fake;
+use fake::faker::name::raw::*;
+use fake::locales::*;
+use rand::Rng;
 use tiny_racing::database::*;
 
 // Static data structures - decoupled
@@ -50,6 +56,12 @@ struct TrackSeedData {
     description: Option<&'static str>,
     laps: i32,
     lap_length_km: f32,
+}
+
+struct PlayerSeedData {
+    username: &'static str,
+    email: Option<&'static str>,
+    password: &'static str,
 }
 
 // Static seed data - decoupled arrays
@@ -429,8 +441,226 @@ const TRACKS: &[TrackSeedData] = &[
     },
 ];
 
+const PLAYERS: &[PlayerSeedData] = &[
+    PlayerSeedData {
+        username: "antoine",
+        email: Some("antoine@example.com"),
+        password: "antoine",
+    },
+];
+
+const NATIONALITIES: &[&str] = &[
+    "American", "British", "French", "German", "Italian", "Spanish", "Dutch", "Belgian",
+    "Australian", "Canadian", "Brazilian", "Mexican", "Japanese", "Chinese", "Korean",
+    "Swedish", "Finnish", "Norwegian", "Danish", "Swiss", "Austrian",
+];
+
+const GENDERS: &[&str] = &["Male", "Female", "Non-binary"];
+
+fn generate_random_car(rng: &mut impl Rng, start_number: i32) -> CarSeedData {
+    CarSeedData {
+        number: start_number,
+        team_number: None, // Always unassigned
+        handling: rng.random_range(0.5..=0.95),
+        acceleration: rng.random_range(0.5..=0.95),
+        top_speed: rng.random_range(0.5..=0.95),
+        reliability: rng.random_range(0.5..=0.95),
+        fuel_consumption: rng.random_range(0.5..=0.95),
+        tire_wear: rng.random_range(0.5..=0.95),
+    }
+}
+
+// Helper struct for generated driver data (uses owned Strings)
+struct GeneratedDriverData {
+    first_name: String,
+    last_name: String,
+    date_of_birth: NaiveDate,
+    nationality: String,
+    gender: String,
+    skill_level: f32,
+    stamina: f32,
+    weather_tolerance: f32,
+    experience: f32,
+    consistency: f32,
+    focus: f32,
+}
+
+fn generate_random_driver(rng: &mut impl Rng) -> GeneratedDriverData {
+    // Select random nationality and gender first
+    let nationality = NATIONALITIES[rng.random_range(0..NATIONALITIES.len())].to_string();
+    let gender = GENDERS[rng.random_range(0..GENDERS.len())].to_string();
+    
+    // Generate names based on nationality locale
+    // Using only locales available in fake crate 4.4.0:
+    // AR_SA, CY_GB, DE_DE, EN, FR_FR, IT_IT, JA_JP, PT_BR, PT_PT, ZH_CN, ZH_TW
+    // See: https://docs.rs/fake/latest/fake/locales/index.html
+    // Note: Each locale is a different type, so we generate names directly in each match arm
+    let (first_name, last_name) = match nationality.as_str() {
+        "French" | "Belgian" => (
+            FirstName(FR_FR).fake::<String>(),
+            LastName(FR_FR).fake::<String>(),
+        ),
+        "German" | "Austrian" | "Swiss" => (
+            FirstName(DE_DE).fake::<String>(),
+            LastName(DE_DE).fake::<String>(),
+        ),
+        "Italian" => (
+            FirstName(IT_IT).fake::<String>(),
+            LastName(IT_IT).fake::<String>(),
+        ),
+        "Japanese" => (
+            FirstName(JA_JP).fake::<String>(),
+            LastName(JA_JP).fake::<String>(),
+        ),
+        "Chinese" => (
+            FirstName(ZH_CN).fake::<String>(),
+            LastName(ZH_CN).fake::<String>(),
+        ),
+        "Brazilian" => (
+            FirstName(PT_BR).fake::<String>(),
+            LastName(PT_BR).fake::<String>(),
+        ),
+        "Portuguese" => (
+            FirstName(PT_PT).fake::<String>(),
+            LastName(PT_PT).fake::<String>(),
+        ),
+        // For nationalities without matching locales, fall back to EN
+        "Spanish" | "Dutch" | "Korean" | "Swedish" | "Finnish" | "Norwegian" | "Danish" | _ => (
+            FirstName(EN).fake::<String>(),
+            LastName(EN).fake::<String>(),
+        ),
+    };
+    
+    // Generate a random date of birth between 1985 and 2005
+    let year = rng.random_range(1985..=2005);
+    let month = rng.random_range(1..=12);
+    let day = rng.random_range(1..=28); // Use 28 to avoid month-specific day issues
+    
+    GeneratedDriverData {
+        first_name,
+        last_name,
+        date_of_birth: NaiveDate::from_ymd_opt(year, month, day).unwrap(),
+        nationality,
+        gender,
+        skill_level: rng.random_range(0.5..=0.95),
+        stamina: rng.random_range(0.5..=0.95),
+        weather_tolerance: rng.random_range(0.5..=0.95),
+        experience: rng.random_range(0.5..=0.95),
+        consistency: rng.random_range(0.5..=0.95),
+        focus: rng.random_range(0.5..=0.95),
+    }
+}
+
+async fn seed_random_cars_and_drivers(
+    db: &Database,
+    num_cars: usize,
+    num_drivers: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut rng = rand::rng();
+    
+    // Get the maximum car number to start from
+    let existing_cars = list_cars(db.pool()).await?;
+    let max_car_number = existing_cars
+        .iter()
+        .map(|c| c.number)
+        .max()
+        .unwrap_or(0);
+    let mut next_car_number = max_car_number + 1;
+    
+    println!("\n=== Seeding Random Unassigned Cars ===");
+    for _ in 0..num_cars {
+        // Find the next available car number
+        while get_car_by_number(db.pool(), next_car_number).await?.is_some() {
+            next_car_number += 1;
+        }
+        
+        let car_data = generate_random_car(&mut rng, next_car_number);
+        
+        let car = create_car(
+            db.pool(),
+            CreateCarRequest {
+                number: car_data.number,
+                team_id: None, // Always unassigned
+                handling: car_data.handling,
+                acceleration: car_data.acceleration,
+                top_speed: car_data.top_speed,
+                reliability: car_data.reliability,
+                fuel_consumption: car_data.fuel_consumption,
+                tire_wear: car_data.tire_wear,
+                base_performance: 1.0,
+            },
+        )
+        .await?;
+        
+        println!(
+            "Created random unassigned car #{} (ID: {}) - handling: {:.2}, acceleration: {:.2}, top_speed: {:.2}",
+            car.number, car.id, car.handling, car.acceleration, car.top_speed
+        );
+        
+        next_car_number += 1;
+    }
+    
+    println!("\n=== Seeding Random Unassigned Drivers ===");
+    for _ in 0..num_drivers {
+        let driver_data = generate_random_driver(&mut rng);
+        
+        // Check if driver already exists (unlikely but possible with random generation)
+        if get_driver_by_first_and_last_name(
+            db.pool(),
+            driver_data.first_name.clone(),
+            driver_data.last_name.clone(),
+        )
+        .await?
+        .is_some()
+        {
+            println!(
+                "Driver '{} {}' already exists, skipping",
+                driver_data.first_name, driver_data.last_name
+            );
+            continue;
+        }
+        
+        let driver = create_driver(
+            db.pool(),
+            CreateDriverRequest {
+                first_name: driver_data.first_name.clone(),
+                last_name: driver_data.last_name.clone(),
+                date_of_birth: driver_data.date_of_birth,
+                nationality: driver_data.nationality.clone(),
+                gender: driver_data.gender.clone(),
+                skill_level: driver_data.skill_level,
+                stamina: driver_data.stamina,
+                weather_tolerance: driver_data.weather_tolerance,
+                experience: driver_data.experience,
+                consistency: driver_data.consistency,
+                focus: driver_data.focus,
+                team_id: None, // Always unassigned
+                car_id: None,  // Always unassigned
+            },
+        )
+        .await?;
+        
+        println!(
+            "Created random unassigned driver: {} {} ({}, {}) (ID: {}) - skill: {:.2}, stamina: {:.2}",
+            driver.first_name,
+            driver.last_name,
+            driver.nationality,
+            driver.gender,
+            driver.id,
+            driver.skill_level,
+            driver.stamina
+        );
+    }
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Check for randomize parameter
+    let args: Vec<String> = std::env::args().collect();
+    let randomize = args.iter().any(|arg| arg == "randomize");
+    
     // Get database URL from environment or use default
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing".to_string()
@@ -438,6 +668,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Connecting to database...");
     let db = Database::new(&database_url).await?;
+
+    // Seed players
+    println!("\n=== Seeding Players ===");
+    for player_data in PLAYERS {
+        // Check if player already exists
+        if let Some(existing) = get_player_by_username(db.pool(), player_data.username).await? {
+            println!("Player '{}' already exists, skipping", existing.username);
+            continue;
+        }
+        let player = create_player(
+            db.pool(),
+            CreatePlayerRequest {
+                username: player_data.username.to_string(),
+                password: player_data.password.to_string(),
+                email: player_data.email.map(|s| s.to_string()),
+            },
+        )
+        .await
+        .map_err(|e| {
+            eprintln!("Error creating player: {}", e);
+            e
+        })?;
+        println!("Created player: {} (ID: {})", player.username, player.id);
+    }
 
     // Seed tracks first (no dependencies)
     println!("\n=== Seeding Tracks ===");
@@ -480,11 +734,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let team = create_team(
             db.pool(),
             CreateTeamRequest {
-                number: team_data.number,
+                number: Some(team_data.number),
+                player_id: None,
                 name: team_data.name.to_string(),
                 logo: team_data.logo.to_string(),
                 color: team_data.color.to_string(),
-                pit_efficiency: team_data.pit_efficiency,
+                pit_efficiency: Some(team_data.pit_efficiency),
             },
         )
         .await?;
@@ -597,16 +852,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    // Seed random cars and drivers if randomize parameter is passed
+    if randomize {
+        println!("\n=== Randomization Mode Enabled ===");
+        seed_random_cars_and_drivers(&db, 20, 30).await?;
+    }
+
     // Print summary
     println!("\n=== Seeding Summary ===");
     let teams = list_teams(db.pool()).await?;
     let cars = list_cars(db.pool()).await?;
     let drivers = list_drivers(db.pool()).await?;
     let tracks = list_tracks(db.pool()).await?;
+    
+    let unassigned_cars = list_unassigned_cars(db.pool()).await?;
+    let unassigned_drivers = list_unassigned_drivers(db.pool()).await?;
 
     println!("Total teams in database: {}", teams.len());
-    println!("Total cars in database: {}", cars.len());
-    println!("Total drivers in database: {}", drivers.len());
+    println!("Total cars in database: {} ({} unassigned)", cars.len(), unassigned_cars.len());
+    println!("Total drivers in database: {} ({} unassigned)", drivers.len(), unassigned_drivers.len());
     println!("Total tracks in database: {}", tracks.len());
 
     println!("\nSeeding completed successfully!");

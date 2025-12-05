@@ -1,10 +1,33 @@
 use super::models::*;
 use sqlx::PgPool;
 use uuid::Uuid;
+use crate::auth::hash_password;
 
 // ========== Team Queries ==========
 
 pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<TeamDb, sqlx::Error> {
+    // If number is not provided, calculate the next available number
+    let team_number = if let Some(number) = request.number {
+        number
+    } else {
+        // Get the maximum team number and add 1
+        let max_number: Option<i32> = sqlx::query_scalar("SELECT MAX(number) FROM team")
+            .fetch_optional(pool)
+            .await?;
+        
+        max_number.map(|n| n + 1).unwrap_or(1)
+    };
+
+    // If pit_efficiency is not provided, generate a random value between 0.4 and 0.8 (inclusive)
+    let pit_efficiency = if let Some(efficiency) = request.pit_efficiency {
+        efficiency
+    } else {
+        use rand::Rng;
+        let mut rng = rand::rng();
+        // Use 0.4..0.81 to ensure 0.8 can be generated (range is exclusive on upper bound)
+        rng.random_range(0.4..0.81)
+    };
+
     let team = sqlx::query_as::<_, TeamDb>(
         // this query check against the database schema for the correct types at compile time query_as!
         r#"
@@ -12,11 +35,11 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
         "#)
-    .bind(request.number)
+    .bind(team_number)
     .bind(request.name)
     .bind(request.logo)
     .bind(request.color)
-    .bind(request.pit_efficiency)
+    .bind(pit_efficiency)
     .bind(request.player_id)
     .fetch_one(pool)
     .await?;
@@ -57,6 +80,15 @@ pub async fn list_teams_by_player(pool: &PgPool, player_id: Uuid) -> Result<Vec<
         .await?;
 
     Ok(teams)
+}
+
+pub async fn get_team_by_player(pool: &PgPool, player_id: Uuid) -> Result<Option<TeamDb>, sqlx::Error> {
+    let team = sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 LIMIT 1")
+        .bind(player_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(team)
 }
 
 pub async fn update_team(
@@ -160,6 +192,16 @@ pub async fn list_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
     Ok(drivers)
 }
 
+pub async fn list_unassigned_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
+    let drivers = sqlx::query_as::<_, DriverDb>(
+        "SELECT * FROM driver WHERE team_id IS NULL ORDER BY last_name, first_name"
+    )
+        .fetch_all(pool)
+        .await?;
+
+    Ok(drivers)
+}
+
 pub async fn update_driver(
     pool: &PgPool,
     id: Uuid,
@@ -249,6 +291,16 @@ pub async fn get_car_by_number(pool: &PgPool, number: i32) -> Result<Option<CarD
 
 pub async fn list_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
     let cars = sqlx::query_as::<_, CarDb>("SELECT * FROM car ORDER BY number")
+        .fetch_all(pool)
+        .await?;
+
+    Ok(cars)
+}
+
+pub async fn list_unassigned_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
+    let cars = sqlx::query_as::<_, CarDb>(
+        "SELECT * FROM car WHERE team_id IS NULL ORDER BY number"
+    )
         .fetch_all(pool)
         .await?;
 
@@ -398,15 +450,18 @@ pub async fn create_player(
     pool: &PgPool,
     request: CreatePlayerRequest,
 ) -> Result<PlayerDb, sqlx::Error> {
+    // Hash password
+    let password_hash = hash_password(&request.password).unwrap();
     let player = sqlx::query_as::<_, PlayerDb>(
         r#"
-        INSERT INTO player (username, email)
-        VALUES ($1, $2)
+        INSERT INTO player (username, email, password_hash)
+        VALUES ($1, $2, $3)
         RETURNING *
         "#,
     )
     .bind(request.username)
     .bind(request.email)
+    .bind(password_hash)
     .fetch_one(pool)
     .await?;
 

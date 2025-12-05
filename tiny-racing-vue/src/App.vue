@@ -1,27 +1,32 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import AppHeader from './components/AppHeader.vue';
 import Game from './components/game.vue';
 import LoginForm from './components/LoginForm.vue';
 import RegisterForm from './components/RegisterForm.vue';
+import Teams from './components/Teams.vue';
+import Market from './components/Market.vue';
 import { isAuthenticated, logout } from './services/ApiService';
 
 const authenticated = ref(false);
-const showLoginForm = ref(false);
-const showRegisterForm = ref(false);
+const currentView = ref('game');
 
 function checkAuth() {
   authenticated.value = isAuthenticated();
 }
 
+function handleNavigate(view: string) {
+  currentView.value = view;
+}
+
 function handleLoginSuccess() {
   authenticated.value = true;
-  showLoginForm.value = false;
+  currentView.value = 'game';
 }
 
 function handleRegisterSuccess() {
-  showRegisterForm.value = false;
-  // Optionally auto-show login form after successful registration
-  showLoginForm.value = true;
+  // Switch to login view after successful registration
+  currentView.value = 'login';
 }
 
 async function handleLogout() {
@@ -30,21 +35,11 @@ async function handleLogout() {
 }
 
 function showLogin() {
-  showLoginForm.value = true;
-  showRegisterForm.value = false;
+  currentView.value = 'login';
 }
 
 function showRegister() {
-  showRegisterForm.value = true;
-  showLoginForm.value = false;
-}
-
-function hideLogin() {
-  showLoginForm.value = false;
-}
-
-function hideRegister() {
-  showRegisterForm.value = false;
+  currentView.value = 'register';
 }
 
 onMounted(() => {
@@ -53,130 +48,105 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <!-- Auth buttons in top-right corner -->
-    <div
-      style="position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px"
-    >
-      <button
-        v-if="!authenticated"
-        @click="showRegister"
-        style="
-          padding: 0.5rem 1rem;
-          background-color: #2d4059;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        "
-      >
-        Register
-      </button>
-      <button
-        v-if="!authenticated"
-        @click="showLogin"
-        style="
-          padding: 0.5rem 1rem;
-          background-color: #2d4059;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        "
-      >
-        Login
-      </button>
-      <button
-        v-if="authenticated"
-        @click="handleLogout"
-        style="
-          padding: 0.5rem 1rem;
-          background-color: #d32f2f;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        "
-      >
-        Logout
-      </button>
-    </div>
+  <div id="app">
+    <!-- Header visible on all pages -->
+    <AppHeader
+      :authenticated="authenticated"
+      :current-view="currentView"
+      @navigate="handleNavigate"
+      @login="showLogin"
+      @register="showRegister"
+      @logout="handleLogout"
+    />
 
-    <!-- Login form overlay (shown when login button is clicked) -->
-    <div
-      v-if="showLoginForm"
-      style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 2000;
-      "
-      @click.self="hideLogin"
-    >
-      <div style="position: relative">
-        <button
-          @click="hideLogin"
-          style="
-            position: absolute;
-            top: -40px;
-            right: 0;
-            background-color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-          "
-        >
-          Close
-        </button>
-        <LoginForm @login-success="handleLoginSuccess" />
+    <!-- Main content area -->
+    <main class="main-content">
+      <!-- Game view -->
+      <div v-show="currentView === 'game'" class="view">
+        <Game />
       </div>
-    </div>
 
-    <!-- Register form overlay (shown when register button is clicked) -->
-    <div
-      v-if="showRegisterForm"
-      style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 2000;
-      "
-      @click.self="hideRegister"
-    >
-      <div style="position: relative">
-        <button
-          @click="hideRegister"
-          style="
-            position: absolute;
-            top: -40px;
-            right: 0;
-            background-color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-          "
-        >
-          Close
-        </button>
-        <RegisterForm @register-success="handleRegisterSuccess" @close="hideRegister" />
+      <!-- Teams view -->
+      <div v-show="currentView === 'my-team'" class="view">
+        <Teams />
       </div>
-    </div>
 
-    <!-- Game is always shown (default page) -->
-    <Game />
+      <!-- Market view -->
+      <div v-show="currentView === 'market'" class="view">
+        <Market />
+      </div>
+
+      <!-- Races view (placeholder) -->
+      <div v-show="currentView === 'races'" class="view">
+        <div class="placeholder-view">
+          <h2>Races</h2>
+          <p>Race list and details will be displayed here.</p>
+        </div>
+      </div>
+
+      <!-- Login view -->
+      <div v-show="currentView === 'login'" class="view">
+        <div class="form-view">
+          <LoginForm @login-success="handleLoginSuccess" />
+        </div>
+      </div>
+
+      <!-- Register view -->
+      <div v-show="currentView === 'register'" class="view">
+        <div class="form-view">
+          <RegisterForm @register-success="handleRegisterSuccess" />
+        </div>
+      </div>
+    </main>
   </div>
 </template>
+
+<style scoped>
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.main-content {
+  flex: 1;
+  background-color: #f5f5f5;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.view {
+  width: 100%;
+  height: 100%;
+}
+
+.placeholder-view {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.placeholder-view h2 {
+  color: #1a1a2e;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.placeholder-view p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.form-view {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: calc(100vh - 100px);
+}
+</style>

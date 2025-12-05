@@ -1,10 +1,10 @@
 use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
 use crate::commands;
 use crate::database::{
-    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_track_by_id,
+    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_team_by_player, get_track_by_id,
 };
-use crate::database::{list_cars, list_drivers, list_players, list_teams, list_teams_by_player, list_tracks};
-use crate::database::{LoginRequest, LoginResponse, RegisterRequest};
+use crate::database::{list_cars, list_drivers, list_players, list_teams, list_teams_by_player, list_tracks, list_unassigned_cars, list_unassigned_drivers};
+use crate::database::{create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest};
 use crate::models::car::CarStatus;
 use crate::models::race::{RaceRunState, RaceState};
 use axum::{
@@ -182,8 +182,11 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .route("/auth/logout", post(logout))
         // DB content routes
         .route("/teams", get(get_teams))
+        .route("/teams/my", get(get_my_team))
         .route("/drivers", get(get_drivers))
+        .route("/drivers/unassigned", get(get_unassigned_drivers))
         .route("/cars", get(get_cars))
+        .route("/cars/unassigned", get(get_unassigned_cars))
         .route("/tracks", get(get_tracks))
         .route("/players", get(get_players))
         .route("/teams/{team_id}", get(get_team))
@@ -192,7 +195,7 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .route("/tracks/{track_id}", get(get_track))
         .route("/players/{player_id}", get(get_player))
         // create routes
-        // .route("/teams", post(create_team))
+        .route("/teams", post(create_team_handler))
         // .route("/drivers", post(create_driver))
         // .route("/cars", post(create_car))
         // .route("/tracks", post(create_track))
@@ -290,6 +293,113 @@ async fn get_team(
     Ok(success(Some(team), None))
 }
 
+// Get the current player's team
+async fn get_my_team(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<ApiResponse<Option<crate::database::TeamDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let player_id = player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+
+    let team = get_team_by_player(pool, player_id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?;
+
+    Ok(success(Some(team), None))
+}
+
+// Create a new team
+async fn create_team_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<CreateTeamRequest>,
+) -> ApiResult<Json<ApiResponse<crate::database::TeamDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Set player_id from token if not provided in request
+    let mut team_request = request;
+    let final_player_id = if team_request.player_id.is_some() {
+        team_request.player_id
+    } else {
+        player_id
+    };
+
+    // Check if player already has a team
+    if let Some(pid) = final_player_id {
+        let existing_team = get_team_by_player(pool, pid)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to check existing team: {}", e)))?;
+
+        if existing_team.is_some() {
+            return Err(ApiError::BadRequest("You already have a team. Each player can only manage one team.".to_string()));
+        }
+        
+        team_request.player_id = Some(pid);
+    }
+
+    // Check if team number already exists (only if number is provided)
+    if let Some(number) = team_request.number {
+        let existing_team = crate::database::get_team_by_number(pool, number)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to check team number: {}", e)))?;
+
+        if existing_team.is_some() {
+            return Err(ApiError::BadRequest(format!("Team number {} already exists", number)));
+        }
+    }
+
+    let team = create_team(pool, team_request)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to create team: {}", e)))?;
+
+    Ok(success(Some(team), Some("Team created successfully".to_string())))
+}
+
 // Get all drivers
 async fn get_drivers(
     State(state): State<AppState>,
@@ -301,6 +411,21 @@ async fn get_drivers(
     let drivers = list_drivers(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
+
+    Ok(success(Some(drivers), None))
+}
+
+// Get unassigned drivers (for market)
+async fn get_unassigned_drivers(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::DriverDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let drivers = list_unassigned_drivers(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e)))?;
 
     Ok(success(Some(drivers), None))
 }
@@ -336,6 +461,21 @@ async fn get_cars(
     let cars = list_cars(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch cars: {}", e)))?;
+
+    Ok(success(Some(cars), None))
+}
+
+// Get unassigned cars (for market)
+async fn get_unassigned_cars(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::CarDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let cars = list_unassigned_cars(pool)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned cars: {}", e)))?;
 
     Ok(success(Some(cars), None))
 }

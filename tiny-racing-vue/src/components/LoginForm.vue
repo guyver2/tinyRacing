@@ -73,8 +73,7 @@ async function handleLogin() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  background-color: #f0f5f9;
+  width: 100%;
 }
 
 .login-form {

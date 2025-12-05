@@ -13,6 +13,7 @@ help:
 	@echo "  db-down       Stop and remove PostgreSQL Docker container"
 	@echo "  db-shell      psql shell into the running database"
 	@echo "  db-seed       Seed the database using the seed script"
+	@echo "  db-seed-randomize Seed the database using the seed script with randomization"
 	@echo "  db-wipe       Delete all database content (tables, schema, everything)"
 	@echo "  run-sim       Start the Rust backend"
 	@echo "  run-vue       Start the Vue.js frontend"
@@ -41,6 +42,9 @@ db-shell:
 
 db-seed:
 	cd $(CARGO_DIR) && cargo run --example seed_db
+
+db-seed-randomize:
+	cd $(CARGO_DIR) && cargo run --example seed_db -- randomize
 
 db-wipe:
 	@echo "⚠️  WARNING: This will delete ALL database content (tables, schemas, everything)!"
