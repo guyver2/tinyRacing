@@ -45,22 +45,12 @@ const isCarTableCollapsed = ref(true);
   </div>
 </template>
 
-<style>
+<style scoped>
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   font-family: 'Courier New', monospace;
-}
-
-body {
-  background-color: #f0f5f9;
-  color: #2d4059;
-  padding: 0;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  margin: 0;
 }
 
 .app-container {
@@ -70,6 +60,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: hidden;
 }
 
 .main-content {

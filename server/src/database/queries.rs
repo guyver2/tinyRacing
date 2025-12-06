@@ -28,11 +28,14 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
         rng.random_range(0.4..0.81)
     };
 
+    // Default cash value for new teams is 500
+    let cash = 500;
+
     let team = sqlx::query_as::<_, TeamDb>(
         // this query check against the database schema for the correct types at compile time query_as!
         r#"
-        INSERT INTO team (number, name, logo, color, pit_efficiency, player_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO team (number, name, logo, color, pit_efficiency, cash, player_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
         "#)
     .bind(team_number)
@@ -40,6 +43,7 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
     .bind(request.logo)
     .bind(request.color)
     .bind(pit_efficiency)
+    .bind(cash)
     .bind(request.player_id)
     .fetch_one(pool)
     .await?;

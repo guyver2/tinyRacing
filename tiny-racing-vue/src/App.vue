@@ -4,7 +4,7 @@ import AppHeader from './components/AppHeader.vue';
 import Game from './components/game.vue';
 import LoginForm from './components/LoginForm.vue';
 import RegisterForm from './components/RegisterForm.vue';
-import Teams from './components/Teams.vue';
+import Team from './components/Team.vue';
 import Market from './components/Market.vue';
 import { isAuthenticated, logout } from './services/ApiService';
 
@@ -60,19 +60,19 @@ onMounted(() => {
     />
 
     <!-- Main content area -->
-    <main class="main-content">
+    <main class="main-content" :class="{ 'no-overflow': currentView === 'game' }">
       <!-- Game view -->
       <div v-show="currentView === 'game'" class="view">
         <Game />
       </div>
 
-      <!-- Teams view -->
+      <!-- Team view -->
       <div v-show="currentView === 'my-team'" class="view">
-        <Teams />
+        <Team />
       </div>
 
       <!-- Market view -->
-      <div v-show="currentView === 'market'" class="view">
+      <div v-show="currentView === 'market'" class="view market-view">
         <Market />
       </div>
 
@@ -114,11 +114,23 @@ onMounted(() => {
   background-color: #f5f5f5;
   margin-top: 0;
   padding-top: 0;
+  overflow-y: auto;
+  color: #1a1a2e;
+}
+
+.main-content.no-overflow {
+  overflow: hidden;
 }
 
 .view {
   width: 100%;
   height: 100%;
+}
+
+.view.market-view {
+  overflow-y: auto;
+  height: auto;
+  min-height: 100%;
 }
 
 .placeholder-view {

@@ -62,6 +62,7 @@
               <h3>#{{ team.number }} - {{ team.name }}</h3>
               <p class="team-details">
                 <span>Pit Efficiency: {{ (team.pit_efficiency * 100).toFixed(1) }}%</span>
+                <span style="margin-left: 1rem;">Cash: ${{ team.cash.toLocaleString() }}</span>
               </p>
             </div>
           </div>

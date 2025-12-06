@@ -185,6 +185,7 @@ export interface TeamDb {
   logo: string;
   color: string;
   pit_efficiency: number;
+  cash: number;
   player_id: string | null;
   created_at: string;
   updated_at: string;
