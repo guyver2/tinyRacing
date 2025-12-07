@@ -7,6 +7,7 @@ use crate::database::{list_cars, list_drivers, list_players, list_teams, list_te
 use crate::database::{create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest};
 use crate::models::car::CarStatus;
 use crate::models::race::{RaceRunState, RaceState};
+use crate::models::driver_avatar::generate_driver_avatar;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -17,7 +18,11 @@ use axum::{
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
 use std::sync::{Arc, Mutex};
+use std::path::Path as StdPath;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use tokio::sync::broadcast;
+use tokio::fs;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
@@ -161,6 +166,63 @@ fn success<T>(data: Option<T>, message: Option<String>) -> Json<ApiResponse<T>> 
         status: "success".to_string(),
         message,
         data,
+    })
+}
+
+// Driver response with avatar URL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriverResponse {
+    #[serde(flatten)]
+    pub driver: crate::database::DriverDb,
+    pub avatar_url: String,
+}
+
+/// Generates a deterministic filename for a driver avatar based on name, gender, and DoB
+fn get_avatar_filename(first_name: &str, last_name: &str, gender: &str, date_of_birth: &chrono::NaiveDate) -> String {
+    let mut hasher = DefaultHasher::new();
+    let full_name = format!("{} {}", first_name, last_name);
+    full_name.hash(&mut hasher);
+    gender.hash(&mut hasher);
+    date_of_birth.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("{:x}.svg", hash)
+}
+
+/// Ensures the avatar exists for a driver, generating it if necessary
+/// Returns the URL path to the avatar
+async fn ensure_driver_avatar(driver: &crate::database::DriverDb) -> Result<String, ApiError> {
+    let filename = get_avatar_filename(&driver.first_name, &driver.last_name, &driver.gender, &driver.date_of_birth);
+    let avatar_dir = StdPath::new("assets/avatars/drivers");
+    let avatar_path = avatar_dir.join(&filename);
+    
+    // If avatar already exists, just return the URL
+    if fs::metadata(&avatar_path).await.is_ok() {
+        return Ok(format!("/assets/avatars/drivers/{}", filename));
+    }
+    
+    // Generate the avatar
+    let full_name = format!("{} {}", driver.first_name, driver.last_name);
+    let svg_content = generate_driver_avatar(&full_name, &driver.gender, &driver.date_of_birth);
+    
+    // Ensure directory exists
+    fs::create_dir_all(avatar_dir)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to create avatar directory: {}", e)))?;
+    
+    // Write the SVG file
+    fs::write(&avatar_path, svg_content)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to write avatar file: {}", e)))?;
+    
+    Ok(format!("/assets/avatars/drivers/{}", filename))
+}
+
+/// Converts a DriverDb to DriverResponse with avatar URL
+async fn driver_to_response(driver: crate::database::DriverDb) -> Result<DriverResponse, ApiError> {
+    let avatar_url = ensure_driver_avatar(&driver).await?;
+    Ok(DriverResponse {
+        driver,
+        avatar_url,
     })
 }
 
@@ -403,7 +465,7 @@ async fn create_team_handler(
 // Get all drivers
 async fn get_drivers(
     State(state): State<AppState>,
-) -> ApiResult<Json<ApiResponse<Vec<crate::database::DriverDb>>>> {
+) -> ApiResult<Json<ApiResponse<Vec<DriverResponse>>>> {
     let pool = state
         .db_pool
         .as_ref()
@@ -412,13 +474,20 @@ async fn get_drivers(
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
 
-    Ok(success(Some(drivers), None))
+    // Convert each driver to DriverResponse with avatar
+    let mut drivers_with_avatars = Vec::new();
+    for driver in drivers {
+        let driver_response = driver_to_response(driver).await?;
+        drivers_with_avatars.push(driver_response);
+    }
+
+    Ok(success(Some(drivers_with_avatars), None))
 }
 
 // Get unassigned drivers (for market)
 async fn get_unassigned_drivers(
     State(state): State<AppState>,
-) -> ApiResult<Json<ApiResponse<Vec<crate::database::DriverDb>>>> {
+) -> ApiResult<Json<ApiResponse<Vec<DriverResponse>>>> {
     let pool = state
         .db_pool
         .as_ref()
@@ -427,14 +496,21 @@ async fn get_unassigned_drivers(
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e)))?;
 
-    Ok(success(Some(drivers), None))
+    // Convert each driver to DriverResponse with avatar
+    let mut drivers_with_avatars = Vec::new();
+    for driver in drivers {
+        let driver_response = driver_to_response(driver).await?;
+        drivers_with_avatars.push(driver_response);
+    }
+
+    Ok(success(Some(drivers_with_avatars), None))
 }
 
 // Get a single driver by ID
 async fn get_driver(
     Path(driver_id): Path<String>,
     State(state): State<AppState>,
-) -> ApiResult<Json<ApiResponse<crate::database::DriverDb>>> {
+) -> ApiResult<Json<ApiResponse<DriverResponse>>> {
     let pool = state
         .db_pool
         .as_ref()
@@ -447,7 +523,10 @@ async fn get_driver(
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
 
-    Ok(success(Some(driver), None))
+    // Convert to DriverResponse with avatar
+    let driver_response = driver_to_response(driver).await?;
+
+    Ok(success(Some(driver_response), None))
 }
 
 // Get all cars

@@ -39,3 +39,9 @@ A text-based Formula 1 race simulation game written in Rust.
 
 #### Web client
 ![Web UI](imgs/web_ui.jpg)
+
+
+#### Credits
+
+- Avatar generation is based on: [https://github.com/dapi-labs/react-nice-avatar/tree/main](https://github.com/dapi-labs/react-nice-avatar/tree/main)
+- Flags are coming from: [https://github.com/hampusborgos/country-flags](https://github.com/hampusborgos/country-flags)

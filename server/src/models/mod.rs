@@ -11,6 +11,10 @@ pub use car::{Car, CarClientData, CarStats, CarStatus};
 pub mod driver;
 pub use driver::{Driver, DrivingStyle};
 
+// driver avatar module
+pub mod driver_avatar;
+pub use driver_avatar::generate_driver_avatar;
+
 // track module
 pub mod track;
 pub use track::{Track, TrackConfig, TrackPoint};

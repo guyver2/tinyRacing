@@ -23,12 +23,34 @@
               v-for="driver in drivers"
               :key="driver.id"
               class="market-item driver-card"
+              :class="{ expanded: expandedDrivers.has(driver.id) }"
             >
-              <div class="item-header">
-                <h4>{{ driver.first_name }} {{ driver.last_name }}</h4>
-                <span class="item-badge">{{ driver.nationality }}</span>
+              <div class="item-header clickable" @click="toggleDriver(driver.id)">
+                <div class="header-content">
+                  <h4>{{ driver.first_name }} {{ driver.last_name }}</h4>
+                  <div class="header-meta">
+                    <img 
+                      v-if="getCountryCode(driver.nationality)"
+                      :src="getFlagUrl(getCountryCode(driver.nationality)!)" 
+                      :alt="driver.nationality"
+                      :title="driver.nationality"
+                      class="country-flag"
+                      
+                    />
+                    <span v-else class="country-flag-fallback" :title="driver.nationality">🏁</span>
+                    <span class="gender-symbol">{{ getGenderSymbol(driver.gender) }}</span>
+                    <span class="average-stat">Avg: {{ getDriverAverageStat(driver).toFixed(1) }}</span>
+                  </div>
+                </div>
+                <img 
+                  v-if="driver.avatar_url"
+                  :src="driver.avatar_url" 
+                  :alt="`${driver.first_name} ${driver.last_name} avatar`"
+                  class="driver-avatar"
+                  :class="{ expanded: expandedDrivers.has(driver.id) }"
+                />
               </div>
-              <div class="item-details">
+              <div v-if="expandedDrivers.has(driver.id)" class="item-details">
                 <div class="detail-row">
                   <span class="detail-label">Skill Level:</span>
                   <span class="detail-value">{{ driver.skill_level.toFixed(1) }}</span>
@@ -54,7 +76,7 @@
                   <span class="detail-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
                 </div>
               </div>
-              <button class="buy-button" disabled>Buy (Coming Soon)</button>
+              <button v-if="expandedDrivers.has(driver.id)" class="buy-button" disabled>Buy (Coming Soon)</button>
             </div>
           </div>
         </section>
@@ -70,12 +92,19 @@
               v-for="car in cars"
               :key="car.id"
               class="market-item car-card"
+              :class="{ expanded: expandedCars.has(car.id) }"
             >
-              <div class="item-header">
-                <h4>Car #{{ car.number }}</h4>
-                <span class="item-badge">Unassigned</span>
+              <div class="item-header clickable" @click="toggleCar(car.id)">
+                <div class="header-content">
+                  <h4>Car #{{ car.number }}</h4>
+                  <div class="header-meta">
+                    <span class="item-badge">Unassigned</span>
+                    <span class="average-stat">Avg: {{ getCarAverageStat(car).toFixed(1) }}</span>
+                  </div>
+                </div>
+                <span class="expand-icon" :class="{ expanded: expandedCars.has(car.id) }">▼</span>
               </div>
-              <div class="item-details">
+              <div v-if="expandedCars.has(car.id)" class="item-details">
                 <div class="detail-row">
                   <span class="detail-label">Handling:</span>
                   <span class="detail-value">{{ car.handling.toFixed(1) }}</span>
@@ -105,7 +134,7 @@
                   <span class="detail-value">{{ car.base_performance.toFixed(1) }}</span>
                 </div>
               </div>
-              <button class="buy-button" disabled>Buy (Coming Soon)</button>
+              <button v-if="expandedCars.has(car.id)" class="buy-button" disabled>Buy (Coming Soon)</button>
             </div>
           </div>
         </section>
@@ -122,6 +151,236 @@ const drivers = ref<DriverDb[]>([]);
 const cars = ref<CarDb[]>([]);
 const loading = ref(true);
 const error = ref('');
+const expandedDrivers = ref<Set<string>>(new Set());
+const expandedCars = ref<Set<string>>(new Set());
+
+function toggleDriver(driverId: string) {
+  if (expandedDrivers.value.has(driverId)) {
+    expandedDrivers.value.delete(driverId);
+  } else {
+    expandedDrivers.value.add(driverId);
+  }
+}
+
+function toggleCar(carId: string) {
+  if (expandedCars.value.has(carId)) {
+    expandedCars.value.delete(carId);
+  } else {
+    expandedCars.value.add(carId);
+  }
+}
+
+function getGenderSymbol(gender: string): string {
+  switch (gender.toLowerCase()) {
+    case 'male':
+      return '♂';
+    case 'female':
+      return '♀';
+    case 'non-binary':
+      return '⚧';
+    default:
+      return '?';
+  }
+}
+
+function getCountryCodeFromNationality(nationality: string): string | null {
+  // Map terms like 'french', 'german', 'dutch', etc. to ISO country codes, case-insensitive
+  const nationalityToCountry: Record<string, string> = {
+    'french': 'fr',
+    'german': 'de',
+    'dutch': 'nl',
+    'british': 'gb',
+    'english': 'gb',
+    'spanish': 'es',
+    'italian': 'it',
+    'swiss': 'ch',
+    'belgian': 'be',
+    'austrian': 'at',
+    'monégasque': 'mc',
+    'monegasque': 'mc',
+    'brazilian': 'br',
+    'argentine': 'ar',
+    'mexican': 'mx',
+    'canadian': 'ca',
+    'australian': 'au',
+    'new zealander': 'nz',
+    'japanese': 'jp',
+    'chinese': 'cn',
+    'korean': 'kr',
+    'south korean': 'kr',
+    'indian': 'in',
+    'russian': 'ru',
+    'finnish': 'fi',
+    'swedish': 'se',
+    'norwegian': 'no',
+    'danish': 'dk',
+    'polish': 'pl',
+    'czech': 'cz',
+    'hungarian': 'hu',
+    'romanian': 'ro',
+    'turkish': 'tr',
+    'south african': 'za',
+    'portuguese': 'pt',
+    'greek': 'gr',
+    'irish': 'ie',
+    'thai': 'th',
+    'malaysian': 'my',
+    'singaporean': 'sg',
+    'indonesian': 'id',
+    'american': 'us',
+    'us-american': 'us',
+    'usa': 'us',
+    'briton': 'gb',
+    'scottish': 'gb',
+    'welsh': 'gb',
+    'northern irish': 'gb',
+  };
+  // Normalize input
+  const key = nationality.trim().toLowerCase();
+  return nationalityToCountry[key] || null;
+}
+
+
+function getCountryCode(countryName: string): string | null {
+  // Map country names to ISO 3166-1 alpha-2 country codes
+  const countryCodes: Record<string, string> = {
+    'United Kingdom': 'gb',
+    'UK': 'gb',
+    'United States': 'us',
+    'USA': 'us',
+    'US': 'us',
+    'France': 'fr',
+    'Germany': 'de',
+    'Italy': 'it',
+    'Spain': 'es',
+    'Netherlands': 'nl',
+    'Belgium': 'be',
+    'Switzerland': 'ch',
+    'Austria': 'at',
+    'Monaco': 'mc',
+    'Brazil': 'br',
+    'Argentina': 'ar',
+    'Mexico': 'mx',
+    'Canada': 'ca',
+    'Australia': 'au',
+    'New Zealand': 'nz',
+    'Japan': 'jp',
+    'China': 'cn',
+    'South Korea': 'kr',
+    'Korea': 'kr',
+    'India': 'in',
+    'Russia': 'ru',
+    'Finland': 'fi',
+    'Sweden': 'se',
+    'Norway': 'no',
+    'Denmark': 'dk',
+    'Poland': 'pl',
+    'Czech Republic': 'cz',
+    'Hungary': 'hu',
+    'Romania': 'ro',
+    'Turkey': 'tr',
+    'South Africa': 'za',
+    'Portugal': 'pt',
+    'Greece': 'gr',
+    'Ireland': 'ie',
+    'Thailand': 'th',
+    'Malaysia': 'my',
+    'Singapore': 'sg',
+    'Indonesia': 'id',
+    'Philippines': 'ph',
+    'Vietnam': 'vn',
+    'UAE': 'ae',
+    'United Arab Emirates': 'ae',
+    'Saudi Arabia': 'sa',
+    'Qatar': 'qa',
+    'Bahrain': 'bh',
+    'Kuwait': 'kw',
+    'Oman': 'om',
+    'Israel': 'il',
+    'Lebanon': 'lb',
+    'Jordan': 'jo',
+    'Egypt': 'eg',
+    'Morocco': 'ma',
+    'Tunisia': 'tn',
+    'Algeria': 'dz',
+    'Nigeria': 'ng',
+    'Kenya': 'ke',
+    'Ghana': 'gh',
+    'Senegal': 'sn',
+    'Ivory Coast': 'ci',
+    'Côte d\'Ivoire': 'ci',
+    'Cameroon': 'cm',
+    'Chile': 'cl',
+    'Colombia': 'co',
+    'Peru': 'pe',
+    'Venezuela': 've',
+    'Ecuador': 'ec',
+    'Uruguay': 'uy',
+    'Paraguay': 'py',
+    'Bolivia': 'bo',
+  };
+  
+  // Try exact match first
+  if (countryCodes[countryName]) {
+    return countryCodes[countryName];
+  }
+  
+  // Try case-insensitive match
+  const normalizedName = countryName.trim();
+  for (const [key, code] of Object.entries(countryCodes)) {
+    if (key.toLowerCase() === normalizedName.toLowerCase()) {
+      return code;
+    }
+  }
+  // try with the nationality
+  const nationalityCode = getCountryCodeFromNationality(countryName);
+  if (nationalityCode) {
+    return nationalityCode;
+  }
+  
+  return null;
+}
+
+// Store flag URLs in a reactive map to cache them
+const flagUrlCache = new Map<string, string>();
+
+function getFlagUrl(countryCode: string): string {
+  const code = countryCode.toLowerCase();
+  
+  // Check cache first
+  if (flagUrlCache.has(code)) {
+    return flagUrlCache.get(code)!;
+  }
+  
+  // Flags are in public/assets/country-flags/svg/
+  // In Vite, public folder files are served from root
+  const url = `/assets/country-flags/svg/${code}.svg`;
+  flagUrlCache.set(code, url);
+  return url;
+}
+
+function getDriverAverageStat(driver: DriverDb): number {
+  return (
+    driver.skill_level +
+    driver.stamina +
+    driver.weather_tolerance +
+    driver.experience +
+    driver.consistency +
+    driver.focus
+  ) / 6;
+}
+
+function getCarAverageStat(car: CarDb): number {
+  return (
+    car.handling +
+    car.acceleration +
+    car.top_speed +
+    car.reliability +
+    car.fuel_consumption +
+    car.tire_wear +
+    car.base_performance
+  ) / 7;
+}
 
 async function loadMarket() {
   loading.value = true;
@@ -245,10 +504,37 @@ h2 {
   border-bottom: 1px solid #e0e0e0;
 }
 
+.item-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.item-header.clickable:hover {
+  background-color: #f5f5f5;
+  margin: -0.5rem -0.5rem 0.5rem -0.5rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.header-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .item-header h4 {
   margin: 0;
   color: #1a1a2e;
   font-size: 1.2rem;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .item-badge {
@@ -260,11 +546,82 @@ h2 {
   font-weight: 500;
 }
 
+.country-flag {
+  width: 24px;
+  height: 18px;
+  object-fit: cover;
+  cursor: help;
+  display: inline-block;
+  transition: transform 0.2s;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.country-flag:hover {
+  transform: scale(1.2);
+  border-color: #2d4059;
+}
+
+.country-flag-fallback {
+  font-size: 1.5rem;
+  cursor: help;
+  line-height: 1;
+  display: inline-block;
+}
+
+.gender-symbol {
+  font-size: 1.2rem;
+  color: #2d4059;
+  font-weight: 600;
+}
+
+.average-stat {
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.driver-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.driver-avatar:hover {
+  border-color: #2d4059;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.driver-avatar.expanded {
+  border-color: #2d4059;
+  box-shadow: 0 0 0 2px rgba(45, 64, 89, 0.2);
+}
+
 .item-details {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
 }
 
 .detail-row {

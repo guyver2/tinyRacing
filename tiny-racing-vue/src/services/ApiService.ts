@@ -280,6 +280,7 @@ export interface DriverDb {
   car_id: string | null;
   created_at: string;
   updated_at: string;
+  avatar_url: string;
 }
 
 // Car interfaces
