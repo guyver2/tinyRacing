@@ -5,7 +5,7 @@
       <p class="races-description">View and create racing events</p>
 
       <!-- Create Race Form (for authenticated users) -->
-      <div v-if="isAuthenticated()" class="create-race-section">
+      <div v-if="authenticated" class="create-race-section">
         <h3>Create New Race</h3>
         <form @submit.prevent="handleCreateRace" class="race-form">
           <div class="form-group">
@@ -115,7 +115,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { getRaces, createRace, getTracks, isAuthenticated, type RaceDb, type CreateRaceRequest, type TrackDb } from '../services/ApiService';
+import { getRaces, createRace, getTracks, type RaceDb, type CreateRaceRequest, type TrackDb } from '../services/ApiService';
+
+const props = defineProps<{
+  authenticated: boolean;
+}>();
 
 const loading = ref(false);
 const error = ref<string | null>(null);

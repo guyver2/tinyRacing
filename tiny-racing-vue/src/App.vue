@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import AppHeader from './components/AppHeader.vue';
 import Game from './components/game.vue';
 import LoginForm from './components/LoginForm.vue';
@@ -18,6 +18,8 @@ function checkAuth() {
 
 function handleNavigate(view: string) {
   currentView.value = view;
+  // Re-check auth when navigating to ensure state is up to date
+  checkAuth();
 }
 
 function handleLoginSuccess() {
@@ -33,6 +35,10 @@ function handleRegisterSuccess() {
 async function handleLogout() {
   await logout();
   authenticated.value = false;
+  // Redirect to initial game view if not already on it
+  if (currentView.value !== 'game') {
+    currentView.value = 'game';
+  }
 }
 
 function showLogin() {
@@ -42,6 +48,11 @@ function showLogin() {
 function showRegister() {
   currentView.value = 'register';
 }
+
+// Watch for view changes and re-check auth to keep state synchronized
+watch(currentView, () => {
+  checkAuth();
+});
 
 onMounted(() => {
   checkAuth();
@@ -69,7 +80,7 @@ onMounted(() => {
 
       <!-- Team view -->
       <div v-show="currentView === 'my-team'" class="view">
-        <Team />
+        <Team :authenticated="authenticated" />
       </div>
 
       <!-- Market view -->
@@ -79,7 +90,7 @@ onMounted(() => {
 
       <!-- Races view -->
       <div v-show="currentView === 'races'" class="view races-view">
-        <Races />
+        <Races :authenticated="authenticated" />
       </div>
 
       <!-- Login view -->

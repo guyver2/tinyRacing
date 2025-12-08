@@ -243,8 +243,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { getMyTeam, createTeam, getTeamDrivers, getTeamCars, assignDriverToCar, type TeamDb, type CreateTeamRequest, type DriverDb, type CarDb } from '@/services/ApiService';
+
+const props = defineProps<{
+  authenticated: boolean;
+}>();
 
 const team = ref<TeamDb | null>(null);
 const loading = ref(true);
@@ -408,8 +412,28 @@ async function handleCreateTeam() {
   }
 }
 
+// Watch for authentication changes and reload team when user logs in
+watch(() => props.authenticated, (newAuth) => {
+  if (newAuth) {
+    // User just logged in, reload team data
+    loadTeam();
+  } else {
+    // User logged out, clear team data
+    team.value = null;
+    drivers.value = [];
+    cars.value = [];
+    error.value = '';
+    loading.value = false;
+  }
+});
+
 onMounted(() => {
-  loadTeam();
+  // Only load team if authenticated
+  if (props.authenticated) {
+    loadTeam();
+  } else {
+    loading.value = false;
+  }
 });
 </script>
 
