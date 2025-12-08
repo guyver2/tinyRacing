@@ -11,6 +11,8 @@ use crate::models::tire::{ClientTireData, Tire, TireType};
 use crate::models::track::Track;
 use crate::models::track::TrackClientData;
 
+pub const MAX_PARTICIPANTS: i64 = 5;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum RaceRunState {
     Paused,

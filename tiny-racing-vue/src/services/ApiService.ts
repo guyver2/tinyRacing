@@ -169,7 +169,7 @@ export function getPlayerId(): string | null {
     const paddedPayload = payload + '='.repeat((4 - (payload.length % 4)) % 4);
     const decoded = atob(paddedPayload.replace(/-/g, '+').replace(/_/g, '/'));
     const claims = JSON.parse(decoded);
-    
+
     return claims.sub || null;
   } catch (err) {
     console.error('Error decoding token:', err);
@@ -210,7 +210,7 @@ export interface ApiResponse<T> {
 export async function getTeams(playerId?: string): Promise<TeamDb[]> {
   const url = playerId ? `/teams?player_id=${playerId}` : '/teams';
   const response = await apiRequest(url);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch teams: ${response.statusText}`);
   }
@@ -219,14 +219,14 @@ export async function getTeams(playerId?: string): Promise<TeamDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch teams');
 }
 
 // Get the current player's team
 export async function getMyTeam(): Promise<TeamDb | null> {
   const response = await apiRequest('/teams/my');
-  
+
   if (!response.ok) {
     if (response.status === 401) {
       throw new Error('You must be logged in to view your team');
@@ -238,7 +238,7 @@ export async function getMyTeam(): Promise<TeamDb | null> {
   if (data.status === 'success') {
     return data.data || null;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch team');
 }
 
@@ -302,7 +302,7 @@ export interface CarDb {
 // Get unassigned drivers (for market)
 export async function getUnassignedDrivers(): Promise<DriverDb[]> {
   const response = await apiRequest('/drivers/unassigned');
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch unassigned drivers: ${response.statusText}`);
   }
@@ -311,14 +311,14 @@ export async function getUnassignedDrivers(): Promise<DriverDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch unassigned drivers');
 }
 
 // Get unassigned cars (for market)
 export async function getUnassignedCars(): Promise<CarDb[]> {
   const response = await apiRequest('/cars/unassigned');
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch unassigned cars: ${response.statusText}`);
   }
@@ -327,7 +327,7 @@ export async function getUnassignedCars(): Promise<CarDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch unassigned cars');
 }
 
@@ -372,7 +372,7 @@ export async function buyCar(carId: string): Promise<TeamDb> {
 // Get drivers for a team
 export async function getTeamDrivers(teamId: string): Promise<DriverDb[]> {
   const response = await apiRequest(`/teams/${teamId}/drivers`);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch team drivers: ${response.statusText}`);
   }
@@ -381,14 +381,14 @@ export async function getTeamDrivers(teamId: string): Promise<DriverDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch team drivers');
 }
 
 // Get cars for a team
 export async function getTeamCars(teamId: string): Promise<CarDb[]> {
   const response = await apiRequest(`/teams/${teamId}/cars`);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch team cars: ${response.statusText}`);
   }
@@ -397,7 +397,7 @@ export async function getTeamCars(teamId: string): Promise<CarDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch team cars');
 }
 
@@ -436,7 +436,7 @@ export interface TrackDb {
 // Get all tracks
 export async function getTracks(): Promise<TrackDb[]> {
   const response = await apiRequest('/tracks');
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch tracks: ${response.statusText}`);
   }
@@ -445,7 +445,7 @@ export async function getTracks(): Promise<TrackDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch tracks');
 }
 
@@ -473,7 +473,7 @@ export interface CreateRaceRequest {
 // Get all races
 export async function getRaces(): Promise<RaceDb[]> {
   const response = await apiRequest('/races');
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch races: ${response.statusText}`);
   }
@@ -482,14 +482,14 @@ export async function getRaces(): Promise<RaceDb[]> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch races');
 }
 
 // Get a single race by ID
 export async function getRace(raceId: string): Promise<RaceDb> {
   const response = await apiRequest(`/races/${raceId}`);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch race: ${response.statusText}`);
   }
@@ -498,7 +498,7 @@ export async function getRace(raceId: string): Promise<RaceDb> {
   if (data.status === 'success' && data.data) {
     return data.data;
   }
-  
+
   throw new Error(data.message || 'Failed to fetch race');
 }
 
@@ -520,4 +520,95 @@ export async function createRace(request: CreateRaceRequest): Promise<RaceDb> {
   }
 
   throw new Error(data.message || 'Failed to create race');
+}
+
+// Registration interfaces
+export interface RegistrationDb {
+  id: string;
+  race_id: string;
+  team_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Register team for a race
+export async function registerForRace(raceId: string): Promise<RegistrationDb> {
+  const response = await apiRequest(`/races/${raceId}/register`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to register for race: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RegistrationDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to register for race');
+}
+
+// Unregister team from a race
+export async function unregisterFromRace(raceId: string): Promise<void> {
+  const response = await apiRequest(`/races/${raceId}/register`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to unregister from race: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<null> = await response.json();
+  if (data.status !== 'success') {
+    throw new Error(data.message || 'Failed to unregister from race');
+  }
+}
+
+// Get registrations for a race
+export async function getRaceRegistrations(raceId: string): Promise<RegistrationDb[]> {
+  const response = await apiRequest(`/races/${raceId}/registrations`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch registrations: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RegistrationDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to fetch registrations');
+}
+
+// Registration with race details interface
+export interface RegistrationWithRaceDetails {
+  registration_id: string;
+  race_id: string;
+  team_id: string;
+  track_name: string;
+  track_id: string;
+  laps: number;
+  race_status: string;
+  start_datetime: string | null;
+  description: string | null;
+  registration_created_at: string;
+}
+
+// Get registrations for a team (with race details)
+export async function getTeamRegistrations(teamId: string): Promise<RegistrationWithRaceDetails[]> {
+  const response = await apiRequest(`/teams/${teamId}/registrations`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch team registrations: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RegistrationWithRaceDetails[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to fetch team registrations');
 }

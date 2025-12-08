@@ -39,22 +39,23 @@
                 <div class="header-content">
                   <h4>{{ driver.first_name }} {{ driver.last_name }}</h4>
                   <div class="header-meta">
-                    <img 
+                    <img
                       v-if="getCountryCode(driver.nationality)"
-                      :src="getFlagUrl(getCountryCode(driver.nationality)!)" 
+                      :src="getFlagUrl(getCountryCode(driver.nationality)!)"
                       :alt="driver.nationality"
                       :title="driver.nationality"
                       class="country-flag"
-                      
                     />
                     <span v-else class="country-flag-fallback" :title="driver.nationality">🏁</span>
                     <span class="gender-symbol">{{ getGenderSymbol(driver.gender) }}</span>
-                    <span class="average-stat">Avg: {{ getDriverAverageStat(driver).toFixed(1) }}</span>
+                    <span class="average-stat"
+                      >Avg: {{ getDriverAverageStat(driver).toFixed(1) }}</span
+                    >
                   </div>
                 </div>
-                <img 
+                <img
                   v-if="driver.avatar_url"
-                  :src="driver.avatar_url" 
+                  :src="driver.avatar_url"
                   :alt="`${driver.first_name} ${driver.last_name} avatar`"
                   class="driver-avatar"
                   :class="{ expanded: expandedDrivers.has(driver.id) }"
@@ -91,8 +92,8 @@
                   <span class="price-label">Price:</span>
                   <span class="price-value">${{ getDriverPrice(driver) }}</span>
                 </div>
-                <button 
-                  class="buy-button" 
+                <button
+                  class="buy-button"
                   :disabled="!canBuyDriver(driver) || buyingDriverId === driver.id"
                   @click="handleBuyDriver(driver)"
                 >
@@ -164,8 +165,8 @@
                   <span class="price-label">Price:</span>
                   <span class="price-value">${{ getCarPrice(car) }}</span>
                 </div>
-                <button 
-                  class="buy-button" 
+                <button
+                  class="buy-button"
                   :disabled="!canBuyCar(car) || buyingCarId === car.id"
                   @click="handleBuyCar(car)"
                 >
@@ -185,7 +186,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { getUnassignedDrivers, getUnassignedCars, buyDriver, buyCar, getMyTeam, type DriverDb, type CarDb, type TeamDb } from '@/services/ApiService';
+import {
+  getUnassignedDrivers,
+  getUnassignedCars,
+  buyDriver,
+  buyCar,
+  getMyTeam,
+  type DriverDb,
+  type CarDb,
+  type TeamDb,
+} from '@/services/ApiService';
 
 const drivers = ref<DriverDb[]>([]);
 const cars = ref<CarDb[]>([]);
@@ -229,53 +239,53 @@ function getGenderSymbol(gender: string): string {
 function getCountryCodeFromNationality(nationality: string): string | null {
   // Map terms like 'french', 'german', 'dutch', etc. to ISO country codes, case-insensitive
   const nationalityToCountry: Record<string, string> = {
-    'french': 'fr',
-    'german': 'de',
-    'dutch': 'nl',
-    'british': 'gb',
-    'english': 'gb',
-    'spanish': 'es',
-    'italian': 'it',
-    'swiss': 'ch',
-    'belgian': 'be',
-    'austrian': 'at',
-    'monégasque': 'mc',
-    'monegasque': 'mc',
-    'brazilian': 'br',
-    'argentine': 'ar',
-    'mexican': 'mx',
-    'canadian': 'ca',
-    'australian': 'au',
+    french: 'fr',
+    german: 'de',
+    dutch: 'nl',
+    british: 'gb',
+    english: 'gb',
+    spanish: 'es',
+    italian: 'it',
+    swiss: 'ch',
+    belgian: 'be',
+    austrian: 'at',
+    monégasque: 'mc',
+    monegasque: 'mc',
+    brazilian: 'br',
+    argentine: 'ar',
+    mexican: 'mx',
+    canadian: 'ca',
+    australian: 'au',
     'new zealander': 'nz',
-    'japanese': 'jp',
-    'chinese': 'cn',
-    'korean': 'kr',
+    japanese: 'jp',
+    chinese: 'cn',
+    korean: 'kr',
     'south korean': 'kr',
-    'indian': 'in',
-    'russian': 'ru',
-    'finnish': 'fi',
-    'swedish': 'se',
-    'norwegian': 'no',
-    'danish': 'dk',
-    'polish': 'pl',
-    'czech': 'cz',
-    'hungarian': 'hu',
-    'romanian': 'ro',
-    'turkish': 'tr',
+    indian: 'in',
+    russian: 'ru',
+    finnish: 'fi',
+    swedish: 'se',
+    norwegian: 'no',
+    danish: 'dk',
+    polish: 'pl',
+    czech: 'cz',
+    hungarian: 'hu',
+    romanian: 'ro',
+    turkish: 'tr',
     'south african': 'za',
-    'portuguese': 'pt',
-    'greek': 'gr',
-    'irish': 'ie',
-    'thai': 'th',
-    'malaysian': 'my',
-    'singaporean': 'sg',
-    'indonesian': 'id',
-    'american': 'us',
+    portuguese: 'pt',
+    greek: 'gr',
+    irish: 'ie',
+    thai: 'th',
+    malaysian: 'my',
+    singaporean: 'sg',
+    indonesian: 'id',
+    american: 'us',
     'us-american': 'us',
-    'usa': 'us',
-    'briton': 'gb',
-    'scottish': 'gb',
-    'welsh': 'gb',
+    usa: 'us',
+    briton: 'gb',
+    scottish: 'gb',
+    welsh: 'gb',
     'northern irish': 'gb',
   };
   // Normalize input
@@ -283,91 +293,90 @@ function getCountryCodeFromNationality(nationality: string): string | null {
   return nationalityToCountry[key] || null;
 }
 
-
 function getCountryCode(countryName: string): string | null {
   // Map country names to ISO 3166-1 alpha-2 country codes
   const countryCodes: Record<string, string> = {
     'United Kingdom': 'gb',
-    'UK': 'gb',
+    UK: 'gb',
     'United States': 'us',
-    'USA': 'us',
-    'US': 'us',
-    'France': 'fr',
-    'Germany': 'de',
-    'Italy': 'it',
-    'Spain': 'es',
-    'Netherlands': 'nl',
-    'Belgium': 'be',
-    'Switzerland': 'ch',
-    'Austria': 'at',
-    'Monaco': 'mc',
-    'Brazil': 'br',
-    'Argentina': 'ar',
-    'Mexico': 'mx',
-    'Canada': 'ca',
-    'Australia': 'au',
+    USA: 'us',
+    US: 'us',
+    France: 'fr',
+    Germany: 'de',
+    Italy: 'it',
+    Spain: 'es',
+    Netherlands: 'nl',
+    Belgium: 'be',
+    Switzerland: 'ch',
+    Austria: 'at',
+    Monaco: 'mc',
+    Brazil: 'br',
+    Argentina: 'ar',
+    Mexico: 'mx',
+    Canada: 'ca',
+    Australia: 'au',
     'New Zealand': 'nz',
-    'Japan': 'jp',
-    'China': 'cn',
+    Japan: 'jp',
+    China: 'cn',
     'South Korea': 'kr',
-    'Korea': 'kr',
-    'India': 'in',
-    'Russia': 'ru',
-    'Finland': 'fi',
-    'Sweden': 'se',
-    'Norway': 'no',
-    'Denmark': 'dk',
-    'Poland': 'pl',
+    Korea: 'kr',
+    India: 'in',
+    Russia: 'ru',
+    Finland: 'fi',
+    Sweden: 'se',
+    Norway: 'no',
+    Denmark: 'dk',
+    Poland: 'pl',
     'Czech Republic': 'cz',
-    'Hungary': 'hu',
-    'Romania': 'ro',
-    'Turkey': 'tr',
+    Hungary: 'hu',
+    Romania: 'ro',
+    Turkey: 'tr',
     'South Africa': 'za',
-    'Portugal': 'pt',
-    'Greece': 'gr',
-    'Ireland': 'ie',
-    'Thailand': 'th',
-    'Malaysia': 'my',
-    'Singapore': 'sg',
-    'Indonesia': 'id',
-    'Philippines': 'ph',
-    'Vietnam': 'vn',
-    'UAE': 'ae',
+    Portugal: 'pt',
+    Greece: 'gr',
+    Ireland: 'ie',
+    Thailand: 'th',
+    Malaysia: 'my',
+    Singapore: 'sg',
+    Indonesia: 'id',
+    Philippines: 'ph',
+    Vietnam: 'vn',
+    UAE: 'ae',
     'United Arab Emirates': 'ae',
     'Saudi Arabia': 'sa',
-    'Qatar': 'qa',
-    'Bahrain': 'bh',
-    'Kuwait': 'kw',
-    'Oman': 'om',
-    'Israel': 'il',
-    'Lebanon': 'lb',
-    'Jordan': 'jo',
-    'Egypt': 'eg',
-    'Morocco': 'ma',
-    'Tunisia': 'tn',
-    'Algeria': 'dz',
-    'Nigeria': 'ng',
-    'Kenya': 'ke',
-    'Ghana': 'gh',
-    'Senegal': 'sn',
+    Qatar: 'qa',
+    Bahrain: 'bh',
+    Kuwait: 'kw',
+    Oman: 'om',
+    Israel: 'il',
+    Lebanon: 'lb',
+    Jordan: 'jo',
+    Egypt: 'eg',
+    Morocco: 'ma',
+    Tunisia: 'tn',
+    Algeria: 'dz',
+    Nigeria: 'ng',
+    Kenya: 'ke',
+    Ghana: 'gh',
+    Senegal: 'sn',
     'Ivory Coast': 'ci',
-    'Côte d\'Ivoire': 'ci',
-    'Cameroon': 'cm',
-    'Chile': 'cl',
-    'Colombia': 'co',
-    'Peru': 'pe',
-    'Venezuela': 've',
-    'Ecuador': 'ec',
-    'Uruguay': 'uy',
-    'Paraguay': 'py',
-    'Bolivia': 'bo',
+    "Côte d'Ivoire": 'ci',
+    Cameroon: 'cm',
+    Chile: 'cl',
+    Colombia: 'co',
+    Peru: 'pe',
+    Venezuela: 've',
+    Ecuador: 'ec',
+    Uruguay: 'uy',
+    Paraguay: 'py',
+    Bolivia: 'bo',
   };
-  
+
   // Try exact match first
   if (countryCodes[countryName]) {
     return countryCodes[countryName];
   }
-  
+
   // Try case-insensitive match
   const normalizedName = countryName.trim();
   for (const [key, code] of Object.entries(countryCodes)) {
@@ -380,7 +389,7 @@ function getCountryCode(countryName: string): string | null {
   if (nationalityCode) {
     return nationalityCode;
   }
-  
+
   return null;
 }
 
@@ -389,12 +398,12 @@ const flagUrlCache = new Map<string, string>();
 
 function getFlagUrl(countryCode: string): string {
   const code = countryCode.toLowerCase();
-  
+
   // Check cache first
   if (flagUrlCache.has(code)) {
     return flagUrlCache.get(code)!;
   }
-  
+
   // Flags are in public/assets/country-flags/svg/
   // In Vite, public folder files are served from root
   const url = `/assets/country-flags/svg/${code}.svg`;
@@ -404,13 +413,14 @@ function getFlagUrl(countryCode: string): string {
 
 function getDriverAverageStat(driver: DriverDb): number {
   return (
-    driver.skill_level +
-    driver.stamina +
-    driver.weather_tolerance +
-    driver.experience +
-    driver.consistency +
-    driver.focus
-  ) / 6;
+    (driver.skill_level +
+      driver.stamina +
+      driver.weather_tolerance +
+      driver.experience +
+      driver.consistency +
+      driver.focus) /
+    6
+  );
 }
 
 function getDriverPrice(driver: DriverDb): number {
@@ -426,10 +436,10 @@ function canBuyDriver(driver: DriverDb): boolean {
 
 async function handleBuyDriver(driver: DriverDb) {
   if (buyingDriverId.value === driver.id) return; // Already processing
-  
+
   buyingDriverId.value = driver.id;
   error.value = '';
-  
+
   try {
     const updatedTeam = await buyDriver(driver.id);
     myTeam.value = updatedTeam;
@@ -445,14 +455,15 @@ async function handleBuyDriver(driver: DriverDb) {
 
 function getCarAverageStat(car: CarDb): number {
   return (
-    car.handling +
-    car.acceleration +
-    car.top_speed +
-    car.reliability +
-    car.fuel_consumption +
-    car.tire_wear +
-    car.base_performance
-  ) / 7;
+    (car.handling +
+      car.acceleration +
+      car.top_speed +
+      car.reliability +
+      car.fuel_consumption +
+      car.tire_wear +
+      car.base_performance) /
+    7
+  );
 }
 
 function getCarPrice(car: CarDb): number {
@@ -468,10 +479,10 @@ function canBuyCar(car: CarDb): boolean {
 
 async function handleBuyCar(car: CarDb) {
   if (buyingCarId.value === car.id) return; // Already processing
-  
+
   buyingCarId.value = car.id;
   error.value = '';
-  
+
   try {
     const updatedTeam = await buyCar(car.id);
     myTeam.value = updatedTeam;
@@ -488,14 +499,14 @@ async function handleBuyCar(car: CarDb) {
 async function loadMarket() {
   loading.value = true;
   error.value = '';
-  
+
   try {
     const [driversData, carsData, teamData] = await Promise.all([
       getUnassignedDrivers(),
       getUnassignedCars(),
       getMyTeam().catch(() => null), // Don't fail if team doesn't exist
     ]);
-    
+
     drivers.value = driversData;
     cars.value = carsData;
     myTeam.value = teamData;
@@ -592,7 +603,9 @@ h2 {
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .market-item:hover {
@@ -836,10 +849,9 @@ h2 {
   .items-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .market-container {
     padding: 1rem;
   }
 }
 </style>
-

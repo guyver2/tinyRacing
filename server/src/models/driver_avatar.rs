@@ -24,7 +24,6 @@
 //! // svg is now a String containing the SVG XML
 //! ```
 
-
 use chrono::NaiveDate;
 
 /// Generates a deterministic seed string from driver information
@@ -56,17 +55,11 @@ fn string_to_hash_code(s: &str) -> u32 {
     }
 }
 
-
-
-
 // Default options matching React's defaultOptions
 const DEFAULT_SEX: &[&str] = &["man", "woman"];
-const DEFAULT_FACE_COLOR: &[&str] = &["#F3D1B0",
-"#E2B792",
-"#C99677",
-"#B07D62",
-"#8D5B39",
-"#6D3E21",];
+const DEFAULT_FACE_COLOR: &[&str] = &[
+    "#F3D1B0", "#E2B792", "#C99677", "#B07D62", "#8D5B39", "#6D3E21",
+];
 const DEFAULT_EAR_SIZE: &[&str] = &["small", "big"];
 const DEFAULT_HAIR_COLOR: &[&str] = &[
     "#000", "#fff", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150", "#2C1810", "#3D2817",

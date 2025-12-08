@@ -1,27 +1,32 @@
 use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
 use crate::commands;
 use crate::database::{
+    assign_car_to_team, assign_driver_to_car, assign_driver_to_team, count_cars_by_team,
+    count_drivers_by_team, count_registrations_by_race, create_race, create_registration,
+    delete_registration, get_race_by_id, get_registration, list_cars, list_cars_by_team,
+    list_drivers, list_drivers_by_team, list_players, list_races,
+    list_registrations_with_race_details_by_team, list_teams, list_teams_by_player, list_tracks,
+    list_unassigned_cars, list_unassigned_drivers, update_race_status, update_team_cash,
+    CreateRaceRequest,
+};
+use crate::database::{
     create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest,
 };
 use crate::database::{
     get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_team_by_player,
     get_track_by_id,
 };
-use crate::database::{
-    list_cars, list_cars_by_team, list_drivers, list_drivers_by_team, list_players, list_teams, list_teams_by_player, list_tracks,
-    list_unassigned_cars, list_unassigned_drivers, assign_driver_to_team, assign_driver_to_car, assign_car_to_team, count_drivers_by_team,
-    count_cars_by_team, update_team_cash, create_race, list_races, CreateRaceRequest, get_race_by_id,
-};
 use crate::models::car::CarStatus;
 use crate::models::driver_avatar::generate_driver_avatar;
-use crate::models::race::{RaceRunState, RaceState};
+use crate::models::race::{RaceRunState, RaceState, MAX_PARTICIPANTS};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
+use chrono::Utc;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
 use std::collections::hash_map::DefaultHasher;
@@ -268,9 +273,19 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .route("/races", get(get_races))
         .route("/races", post(create_race_handler))
         .route("/races/{race_id}", get(get_race))
+        .route("/races/{race_id}/register", post(register_for_race))
+        .route("/races/{race_id}/register", delete(unregister_from_race))
+        .route(
+            "/races/{race_id}/registrations",
+            get(get_race_registrations),
+        )
         .route("/teams/{team_id}", get(get_team))
         .route("/teams/{team_id}/drivers", get(get_team_drivers))
         .route("/teams/{team_id}/cars", get(get_team_cars))
+        .route(
+            "/teams/{team_id}/registrations",
+            get(get_team_registrations),
+        )
         .route("/drivers/{driver_id}", get(get_driver))
         .route("/drivers/{driver_id}/buy", post(buy_driver))
         .route("/drivers/{driver_id}/assign-car", post(assign_driver_car))
@@ -612,18 +627,19 @@ async fn buy_driver(
 
     // Check if driver is already assigned
     if driver.team_id.is_some() {
-        return Err(ApiError::BadRequest("Driver is already assigned to a team".to_string()));
+        return Err(ApiError::BadRequest(
+            "Driver is already assigned to a team".to_string(),
+        ));
     }
 
     // Calculate driver price: 100 * average of stat values
-    let avg_stat = (
-        driver.skill_level
-            + driver.stamina
-            + driver.weather_tolerance
-            + driver.experience
-            + driver.consistency
-            + driver.focus
-    ) / 6.0;
+    let avg_stat = (driver.skill_level
+        + driver.stamina
+        + driver.weather_tolerance
+        + driver.experience
+        + driver.consistency
+        + driver.focus)
+        / 6.0;
     let price = (avg_stat * 100.0) as i32;
 
     // Check if team has enough cash
@@ -713,19 +729,20 @@ async fn buy_car(
 
     // Check if car is already assigned
     if car.team_id.is_some() {
-        return Err(ApiError::BadRequest("Car is already assigned to a team".to_string()));
+        return Err(ApiError::BadRequest(
+            "Car is already assigned to a team".to_string(),
+        ));
     }
 
     // Calculate car price: 100 * average of stat values
-    let avg_stat = (
-        car.handling
-            + car.acceleration
-            + car.top_speed
-            + car.reliability
-            + car.fuel_consumption
-            + car.tire_wear
-            + car.base_performance
-    ) / 7.0;
+    let avg_stat = (car.handling
+        + car.acceleration
+        + car.top_speed
+        + car.reliability
+        + car.fuel_consumption
+        + car.tire_wear
+        + car.base_performance)
+        / 7.0;
     let price = (avg_stat * 100.0) as i32;
 
     // Check if team has enough cash
@@ -821,24 +838,28 @@ async fn assign_driver_car(
 
     // Verify driver belongs to the team
     if driver.team_id != Some(team.id) {
-        return Err(ApiError::BadRequest("Driver does not belong to your team".to_string()));
+        return Err(ApiError::BadRequest(
+            "Driver does not belong to your team".to_string(),
+        ));
     }
 
     // Parse car_id if provided
     let car_uuid = if let Some(car_id_str) = request.car_id {
         let uuid = Uuid::parse_str(&car_id_str)
             .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id_str)))?;
-        
+
         // Verify car belongs to the team
         let car = get_car_by_id(pool, uuid)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
             .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id_str)))?;
-        
+
         if car.team_id != Some(team.id) {
-            return Err(ApiError::BadRequest("Car does not belong to your team".to_string()));
+            return Err(ApiError::BadRequest(
+                "Car does not belong to your team".to_string(),
+            ));
         }
-        
+
         Some(uuid)
     } else {
         None
@@ -849,14 +870,14 @@ async fn assign_driver_car(
         let drivers_with_car = list_drivers_by_team(pool, team.id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
-        
+
         // Check if another driver is already assigned to this car
         for d in drivers_with_car {
             if d.id != driver_uuid && d.car_id == Some(car_uuid_val) {
                 // Unassign the other driver first
-                assign_driver_to_car(pool, d.id, None)
-                    .await
-                    .map_err(|e| ApiError::InternalError(format!("Failed to unassign driver: {}", e)))?;
+                assign_driver_to_car(pool, d.id, None).await.map_err(|e| {
+                    ApiError::InternalError(format!("Failed to unassign driver: {}", e))
+                })?;
                 break;
             }
         }
@@ -1114,14 +1135,26 @@ async fn create_race_handler(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Validate track exists
-    let track = get_track_by_id(pool, request.track_id)
+    let _track = get_track_by_id(pool, request.track_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch track: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("Track not found".to_string()))?;
 
     // Validate laps is positive
     if request.laps <= 0 {
-        return Err(ApiError::BadRequest("Laps must be greater than 0".to_string()));
+        return Err(ApiError::BadRequest(
+            "Laps must be greater than 0".to_string(),
+        ));
+    }
+
+    // Validate start_datetime is not in the past
+    if let Some(start_datetime) = request.start_datetime {
+        let now = Utc::now();
+        if start_datetime < now {
+            return Err(ApiError::BadRequest(
+                "Race start time cannot be in the past".to_string(),
+            ));
+        }
     }
 
     // Create race
@@ -1133,6 +1166,290 @@ async fn create_race_handler(
         Some(race),
         Some("Race created successfully".to_string()),
     ))
+}
+
+// Register team for race
+async fn register_for_race(
+    Path(race_id): Path<String>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<ApiResponse<crate::database::RegistrationDb>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let player_id =
+        player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+
+    // Get the player's team
+    let team = get_team_by_player(pool, player_id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
+
+    // Parse race ID
+    let race_uuid = Uuid::parse_str(&race_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
+
+    // Verify race exists
+    let race = get_race_by_id(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
+
+    // Check if race is open for registration
+    if race.status != "REGISTRATION_OPEN" {
+        return Err(ApiError::BadRequest(format!(
+            "Race is not open for registration. Current status: {}",
+            race.status
+        )));
+    }
+
+    // Check if race start time is in the past
+    if let Some(start_datetime) = race.start_datetime {
+        let now = Utc::now();
+        if start_datetime < now {
+            // Set race status as REGISTRATION_CLOSED
+            update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
+                .await
+                .map_err(|e| {
+                    ApiError::InternalError(format!(
+                        "Failed to close registration for past-start race: {}",
+                        e
+                    ))
+                })?;
+            return Err(ApiError::BadRequest(
+                "Cannot register for a race that has already started or is in the past".to_string(),
+            ));
+        }
+    }
+
+    // Check if already registered
+    let existing_registration = get_registration(pool, race_uuid, team.id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
+
+    if existing_registration.is_some() {
+        return Err(ApiError::BadRequest(
+            "Your team is already registered for this race".to_string(),
+        ));
+    }
+
+    // Check current registration count
+    let current_count = count_registrations_by_race(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to count registrations: {}", e)))?;
+
+    // Check if race is already full (MAX_PARTICIPANTS participants)
+    if current_count >= MAX_PARTICIPANTS {
+        return Err(ApiError::BadRequest(format!(
+            "Race is full. Maximum {} participants allowed.",
+            MAX_PARTICIPANTS
+        )));
+    }
+
+    // Create registration
+    let registration = create_registration(pool, race_uuid, team.id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to register for race: {}", e)))?;
+
+    // Check if we just reached MAX_PARTICIPANTS // 2 participants and close registration
+    let new_count = current_count + 1;
+    if new_count >= MAX_PARTICIPANTS {
+        update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
+            .await
+            .map_err(|e| {
+                ApiError::InternalError(format!(
+                    "Failed to close registration after reaching capacity: {}",
+                    e
+                ))
+            })?;
+    }
+
+    Ok(success(
+        Some(registration),
+        Some("Successfully registered for race".to_string()),
+    ))
+}
+
+// Unregister team from race
+async fn unregister_from_race(
+    Path(race_id): Path<String>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let player_id =
+        player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+
+    // Get the player's team
+    let team = get_team_by_player(pool, player_id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
+
+    // Parse race ID
+    let race_uuid = Uuid::parse_str(&race_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
+
+    // Verify race exists
+    let race = get_race_by_id(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
+
+    // Check if race is open or closed for registration (allow unregistration in both cases)
+    // Only prevent unregistration if race is already ongoing or finished
+    if race.status != "REGISTRATION_OPEN" && race.status != "REGISTRATION_CLOSED" {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot unregister from race. Current status: {}",
+            race.status
+        )));
+    }
+
+    // Check if registered
+    let existing_registration = get_registration(pool, race_uuid, team.id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
+
+    if existing_registration.is_none() {
+        return Err(ApiError::BadRequest(
+            "Your team is not registered for this race".to_string(),
+        ));
+    }
+
+    // Check current registration count
+    let current_count = count_registrations_by_race(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to count registrations: {}", e)))?;
+
+    // Delete registration
+    let deleted = delete_registration(pool, race_uuid, team.id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to unregister from race: {}", e)))?;
+
+    if !deleted {
+        return Err(ApiError::InternalError(
+            "Failed to unregister from race".to_string(),
+        ));
+    }
+
+    // If race was closed (full at MAX_PARTICIPANTS) and now has less than MAX_PARTICIPANTS participants after deletion, reopen registration
+    // current_count was the count before deletion, so after deletion it's current_count - 1
+    if race.status == "REGISTRATION_CLOSED" && current_count == MAX_PARTICIPANTS {
+        update_race_status(pool, race_uuid, "REGISTRATION_OPEN")
+            .await
+            .map_err(|e| {
+                ApiError::InternalError(format!(
+                    "Failed to reopen registration after unregistration: {}",
+                    e
+                ))
+            })?;
+    }
+
+    Ok(success(
+        None,
+        Some("Successfully unregistered from race".to_string()),
+    ))
+}
+
+// Get registrations for a race
+async fn get_race_registrations(
+    Path(race_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::RegistrationDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Parse race ID
+    let race_uuid = Uuid::parse_str(&race_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
+
+    // Verify race exists
+    let _race = get_race_by_id(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
+
+    // Get registrations
+    let registrations = crate::database::list_registrations_by_race(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
+
+    Ok(success(Some(registrations), None))
+}
+
+// Get registrations for a team (with race details)
+async fn get_team_registrations(
+    Path(team_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::RegistrationWithRaceDetails>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Parse team ID
+    let team_uuid = Uuid::parse_str(&team_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
+
+    // Verify team exists
+    let _team = get_team_by_id(pool, team_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Team with ID {} not found", team_id)))?;
+
+    // Get registrations with race details
+    let registrations = list_registrations_with_race_details_by_team(pool, team_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
+
+    Ok(success(Some(registrations), None))
 }
 
 // Login endpoint

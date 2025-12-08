@@ -1,12 +1,22 @@
 <template>
   <div class="races-container">
     <div class="races-content">
-      <h2>Races</h2>
-      <p class="races-description">View and create racing events</p>
+      <div class="races-header">
+        <h2>Races</h2>
+        <!-- Create Race Button (for authenticated users) -->
+        <div v-if="authenticated && !showCreateForm" class="create-race-button-container">
+          <button @click="showCreateForm = true" class="btn btn-primary">Create Race</button>
+        </div>
+      </div>
 
       <!-- Create Race Form (for authenticated users) -->
-      <div v-if="authenticated" class="create-race-section">
-        <h3>Create New Race</h3>
+      <div v-if="authenticated && showCreateForm" class="create-race-section">
+        <div class="form-header">
+          <h3>Create New Race</h3>
+          <button @click="closeCreateForm" class="btn-close" type="button" aria-label="Close form">
+            ×
+          </button>
+        </div>
         <form @submit.prevent="handleCreateRace" class="race-form">
           <div class="form-group">
             <label for="track">Track *</label>
@@ -20,22 +30,12 @@
 
           <div class="form-group">
             <label for="laps">Number of Laps *</label>
-            <input
-              id="laps"
-              type="number"
-              v-model.number="formData.laps"
-              min="1"
-              required
-            />
+            <input id="laps" type="number" v-model.number="formData.laps" min="1" required />
           </div>
 
           <div class="form-group">
             <label for="start_datetime">Start Date (optional)</label>
-            <input
-              id="start_datetime"
-              type="datetime-local"
-              v-model="formData.start_datetime"
-            />
+            <input id="start_datetime" type="datetime-local" v-model="formData.start_datetime" />
           </div>
 
           <div class="form-group">
@@ -53,9 +53,7 @@
               <span v-if="creating">Creating...</span>
               <span v-else>Create Race</span>
             </button>
-            <button type="button" class="btn btn-secondary" @click="resetForm">
-              Reset
-            </button>
+            <button type="button" class="btn btn-secondary" @click="resetForm">Reset</button>
           </div>
 
           <div v-if="createError" class="error-message">{{ createError }}</div>
@@ -106,6 +104,37 @@
                 <span class="detail-value">{{ formatDate(race.created_at) }}</span>
               </div>
             </div>
+            <!-- Registration section for authenticated users with a team -->
+            <div v-if="authenticated && myTeam" class="race-actions">
+              <div v-if="isRegistered(race.id)" class="registration-status registered">
+                <span class="registration-icon">✓</span>
+                <span>Registered</span>
+              </div>
+              <!-- <div v-else-if="race.status === 'REGISTRATION_CLOSED'" class="registration-status full">
+                <span class="registration-icon">✗</span>
+                <span>Registration Closed</span>
+              </div> -->
+              <div class="action-buttons">
+                <button
+                  v-if="canRegister(race)"
+                  @click="handleRegister(race.id)"
+                  class="btn btn-success"
+                  :disabled="registering.get(race.id)"
+                >
+                  <span v-if="registering.get(race.id)">Registering...</span>
+                  <span v-else>Register</span>
+                </button>
+                <button
+                  v-if="canUnregister(race)"
+                  @click="handleUnregister(race.id)"
+                  class="btn btn-warning"
+                  :disabled="registering.get(race.id)"
+                >
+                  <span v-if="registering.get(race.id)">Unregistering...</span>
+                  <span v-else>Unregister</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -114,8 +143,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { getRaces, createRace, getTracks, type RaceDb, type CreateRaceRequest, type TrackDb } from '../services/ApiService';
+import { ref, onMounted, watch } from 'vue';
+import {
+  getRaces,
+  createRace,
+  getTracks,
+  getMyTeam,
+  registerForRace,
+  unregisterFromRace,
+  getRaceRegistrations,
+  type RaceDb,
+  type CreateRaceRequest,
+  type TrackDb,
+  type TeamDb,
+  type RegistrationDb,
+} from '../services/ApiService';
 
 const props = defineProps<{
   authenticated: boolean;
@@ -128,6 +170,10 @@ const tracks = ref<TrackDb[]>([]);
 const creating = ref(false);
 const createError = ref<string | null>(null);
 const createSuccess = ref<string | null>(null);
+const showCreateForm = ref(false);
+const myTeam = ref<TeamDb | null>(null);
+const registrations = ref<Map<string, RegistrationDb>>(new Map());
+const registering = ref<Map<string, boolean>>(new Map());
 
 const formData = ref<Omit<CreateRaceRequest, 'status'>>({
   track_id: '',
@@ -141,6 +187,10 @@ async function loadRaces() {
   error.value = null;
   try {
     races.value = await getRaces();
+    // Load registrations for all races if authenticated
+    if (props.authenticated && myTeam.value) {
+      await loadRegistrationsForAllRaces();
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load races';
   } finally {
@@ -155,6 +205,95 @@ async function loadTracks() {
     console.error('Failed to load tracks:', err);
   }
 }
+
+async function loadMyTeam() {
+  if (!props.authenticated) {
+    return;
+  }
+  try {
+    myTeam.value = await getMyTeam();
+    // Load registrations after team is loaded
+    if (myTeam.value) {
+      await loadRegistrationsForAllRaces();
+    }
+  } catch (err) {
+    console.error('Failed to load team:', err);
+  }
+}
+
+async function loadRegistrationsForAllRaces() {
+  if (!myTeam.value) return;
+
+  // Load registrations for each race in parallel
+  const promises = races.value.map(async (race) => {
+    try {
+      const regs = await getRaceRegistrations(race.id);
+      // Check if our team is registered
+      const myRegistration = regs.find((r) => r.team_id === myTeam.value!.id);
+      if (myRegistration) {
+        registrations.value.set(race.id, myRegistration);
+      } else {
+        registrations.value.delete(race.id);
+      }
+    } catch (err) {
+      console.error(`Failed to load registrations for race ${race.id}:`, err);
+    }
+  });
+
+  await Promise.all(promises);
+}
+
+async function handleRegister(raceId: string) {
+  if (!myTeam.value) {
+    error.value = 'You need to have a team to register for a race';
+    return;
+  }
+
+  registering.value.set(raceId, true);
+  try {
+    await registerForRace(raceId);
+    // Reload races to get updated status (might have changed to REGISTRATION_CLOSED)
+    await loadRaces();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to register for race';
+  } finally {
+    registering.value.set(raceId, false);
+  }
+}
+
+async function handleUnregister(raceId: string) {
+  if (!myTeam.value) {
+    error.value = 'You need to have a team to unregister from a race';
+    return;
+  }
+
+  registering.value.set(raceId, true);
+  try {
+    await unregisterFromRace(raceId);
+    // Reload races to get updated status (might have changed back to REGISTRATION_OPEN)
+    await loadRaces();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to unregister from race';
+  } finally {
+    registering.value.set(raceId, false);
+  }
+}
+
+const isRegistered = (raceId: string): boolean => {
+  return registrations.value.has(raceId);
+};
+
+const canRegister = (race: RaceDb): boolean => {
+  return race.status === 'REGISTRATION_OPEN' && !isRegistered(race.id);
+};
+
+const canUnregister = (race: RaceDb): boolean => {
+  // Allow unregistration if race is open or closed (to free up spots)
+  return (
+    (race.status === 'REGISTRATION_OPEN' || race.status === 'REGISTRATION_CLOSED') &&
+    isRegistered(race.id)
+  );
+};
 
 async function handleCreateRace() {
   creating.value = true;
@@ -184,6 +323,7 @@ async function handleCreateRace() {
     await createRace(request);
     createSuccess.value = 'Race created successfully!';
     resetForm();
+    showCreateForm.value = false;
     await loadRaces(); // Reload races list
   } catch (err) {
     createError.value = err instanceof Error ? err.message : 'Failed to create race';
@@ -203,15 +343,22 @@ function resetForm() {
   createSuccess.value = null;
 }
 
+function closeCreateForm() {
+  showCreateForm.value = false;
+  resetForm();
+}
+
 function getTrackName(trackId: string): string {
-  const track = tracks.value.find(t => t.id === trackId);
+  const track = tracks.value.find((t) => t.id === trackId);
   return track ? track.name : 'Unknown Track';
 }
 
 function formatStatus(status: string): string {
-  return status.replace(/_/g, ' ').toLowerCase()
+  return status
+    .replace(/_/g, ' ')
+    .toLowerCase()
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -235,12 +382,32 @@ function formatDate(dateString: string | null): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
   });
 }
 
+// Reload data when authenticated status changes
+watch(
+  () => props.authenticated,
+  async (newAuth) => {
+    if (newAuth) {
+      // When user becomes authenticated, reload team and registrations
+      await loadMyTeam();
+      if (myTeam.value) {
+        await loadRaces();
+      }
+    } else {
+      // Clear data when logged out
+      myTeam.value = null;
+      registrations.value.clear();
+    }
+  },
+  { immediate: false },
+);
+
 onMounted(async () => {
   await loadTracks();
+  await loadMyTeam();
   await loadRaces();
 });
 </script>
@@ -252,16 +419,27 @@ onMounted(async () => {
   padding: 2rem 1.5rem;
 }
 
+.races-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
 .races-content h2 {
   color: #1a1a2e;
   font-size: 2rem;
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .races-description {
   color: #666;
   font-size: 1.1rem;
   margin-bottom: 2rem;
+}
+
+.create-race-button-container {
+  margin: 0;
 }
 
 .create-race-section {
@@ -272,10 +450,38 @@ onMounted(async () => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .create-race-section h3 {
   color: #1a1a2e;
   font-size: 1.5rem;
-  margin-bottom: 1rem;
+  margin: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  background-color: #f0f0f0;
+  color: #333;
 }
 
 .race-form {
@@ -397,7 +603,9 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .race-card:hover {
@@ -491,7 +699,79 @@ onMounted(async () => {
   color: #333;
 }
 
+.race-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.registration-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.registration-status.registered {
+  color: #2e7d32;
+}
+
+.registration-status.full {
+  color: #e65100;
+}
+
+.registration-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-success {
+  background-color: #2e7d32;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #1b5e20;
+}
+
+.btn-warning {
+  background-color: #f57c00;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #e65100;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
+  .races-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .create-race-button-container {
+    width: 100%;
+  }
+
+  .create-race-button-container .btn {
+    width: 100%;
+  }
+
   .races-grid {
     grid-template-columns: 1fr;
   }
@@ -503,6 +783,18 @@ onMounted(async () => {
   .btn {
     width: 100%;
   }
+
+  .race-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons .btn {
+    width: 100%;
+  }
 }
 </style>
-

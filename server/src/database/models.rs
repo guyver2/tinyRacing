@@ -192,3 +192,19 @@ pub struct CreateRaceRequest {
     pub start_datetime: Option<DateTime<Utc>>,
     pub description: Option<String>,
 }
+
+// Database representation of a Registration
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct RegistrationDb {
+    pub id: Uuid,
+    pub race_id: Uuid,
+    pub team_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRegistrationRequest {
+    pub race_id: Uuid,
+    pub team_id: Uuid,
+}

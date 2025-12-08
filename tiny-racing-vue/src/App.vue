@@ -5,6 +5,7 @@ import Game from './components/game.vue';
 import LoginForm from './components/LoginForm.vue';
 import RegisterForm from './components/RegisterForm.vue';
 import Team from './components/Team.vue';
+import AllTeams from './components/AllTeams.vue';
 import Market from './components/Market.vue';
 import Races from './components/Races.vue';
 import { isAuthenticated, logout } from './services/ApiService';
@@ -81,6 +82,11 @@ onMounted(() => {
       <!-- Team view -->
       <div v-show="currentView === 'my-team'" class="view">
         <Team :authenticated="authenticated" />
+      </div>
+
+      <!-- All Teams view -->
+      <div v-show="currentView === 'all-teams'" class="view">
+        <AllTeams />
       </div>
 
       <!-- Market view -->

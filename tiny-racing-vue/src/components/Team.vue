@@ -64,7 +64,7 @@
                   <h3>#{{ team.number }} - {{ team.name }}</h3>
                   <p class="team-details">
                     <span>Pit Efficiency: {{ (team.pit_efficiency * 100).toFixed(1) }}%</span>
-                    <span style="margin-left: 1rem;">Cash: ${{ team.cash.toLocaleString() }}</span>
+                    <span style="margin-left: 1rem">Cash: ${{ team.cash.toLocaleString() }}</span>
                   </p>
                 </div>
               </div>
@@ -72,163 +72,211 @@
                 <img :src="team.logo" :alt="team.name" />
               </div>
             </div>
+
+            <!-- Upcoming Races Section -->
+            <div class="upcoming-races-section">
+              <h4 class="section-title-small">Upcoming Races</h4>
+              <div v-if="loadingRegistrations" class="loading-small">Loading races...</div>
+              <div v-else-if="errorRegistrations" class="error-small">{{ errorRegistrations }}</div>
+              <div v-else-if="registeredRaces.length === 0" class="no-races">
+                <p>No upcoming races</p>
+              </div>
+              <div v-else class="races-list">
+                <div
+                  v-for="raceReg in registeredRaces"
+                  :key="raceReg.registration_id"
+                  class="race-card-small"
+                >
+                  <div class="race-card-line-1">
+                    <span class="race-track-name">{{ raceReg.track_name }}</span>
+                    <span class="race-laps">{{ raceReg.laps }} laps</span>
+                  </div>
+                  <div class="race-card-line-2">
+                    <span class="race-date">{{ formatRaceDate(raceReg.start_datetime) }}</span>
+                    <button
+                      @click="handleUnregisterFromRace(raceReg.race_id)"
+                      class="btn-unregister"
+                      :disabled="unregisteringRaceId === raceReg.race_id"
+                    >
+                      {{ unregisteringRaceId === raceReg.race_id ? '...' : 'Unregister' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Lineup Section -->
           <div class="lineup-column">
             <div v-if="!loadingLineup && !errorLineup" class="lineup-section">
-          
-          <!-- Active Section: Cars with Drivers -->
-          <div class="active-section">
-            <h3 class="section-title">Lineup</h3>
-            <div class="cars-grid">
-              <div
-                v-for="car in sortedCars"
-                :key="car.id"
-                class="car-slot"
-                :class="{ 'has-driver': getDriverForCar(car) }"
-                @drop="handleDrop($event, car.id)"
-                @dragover.prevent
-                @dragenter.prevent
-              >
-                <div class="car-header">
-                  <h5>Car #{{ car.number }}</h5>
-                </div>
-                <div class="car-stats">
-                  <div class="stat-row">
-                    <span class="stat-label">Handling:</span>
-                    <span class="stat-value">{{ car.handling.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Acceleration:</span>
-                    <span class="stat-value">{{ car.acceleration.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Top Speed:</span>
-                    <span class="stat-value">{{ car.top_speed.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Reliability:</span>
-                    <span class="stat-value">{{ car.reliability.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Fuel Consumption:</span>
-                    <span class="stat-value">{{ car.fuel_consumption.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Tire Wear:</span>
-                    <span class="stat-value">{{ car.tire_wear.toFixed(1) }}</span>
-                  </div>
-                </div>
-                <div v-if="getDriverForCar(car)" class="driver-assigned">
-                  <button
-                    class="unseat-button"
-                    @click="handleUnseat(getDriverForCar(car)!.id)"
-                    :disabled="unseatingDriverId === getDriverForCar(car)?.id"
-                    title="Unseat driver"
+              <!-- Active Section: Cars with Drivers -->
+              <div class="active-section">
+                <h3 class="section-title">Lineup</h3>
+                <div class="cars-grid">
+                  <div
+                    v-for="car in sortedCars"
+                    :key="car.id"
+                    class="car-slot"
+                    :class="{ 'has-driver': getDriverForCar(car) }"
+                    @drop="handleDrop($event, car.id)"
+                    @dragover.prevent
+                    @dragenter.prevent
                   >
-                    {{ unseatingDriverId === getDriverForCar(car)?.id ? '...' : '×' }}
-                  </button>
-                  <div class="driver-header">
-                    <img
-                      v-if="getDriverForCar(car)?.avatar_url"
-                      :src="getDriverForCar(car)?.avatar_url"
-                      :alt="`${getDriverForCar(car)?.first_name} ${getDriverForCar(car)?.last_name} avatar`"
-                      class="driver-avatar"
-                    />
-                    <div class="driver-name">
-                      <h4>{{ getDriverForCar(car)?.first_name }} {{ getDriverForCar(car)?.last_name }}</h4>
-                      <span class="driver-nationality">{{ getDriverForCar(car)?.nationality }}</span>
+                    <div class="car-header">
+                      <h5>Car #{{ car.number }}</h5>
+                    </div>
+                    <div class="car-stats">
+                      <div class="stat-row">
+                        <span class="stat-label">Handling:</span>
+                        <span class="stat-value">{{ car.handling.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Acceleration:</span>
+                        <span class="stat-value">{{ car.acceleration.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Top Speed:</span>
+                        <span class="stat-value">{{ car.top_speed.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Reliability:</span>
+                        <span class="stat-value">{{ car.reliability.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Fuel Consumption:</span>
+                        <span class="stat-value">{{ car.fuel_consumption.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Tire Wear:</span>
+                        <span class="stat-value">{{ car.tire_wear.toFixed(1) }}</span>
+                      </div>
+                    </div>
+                    <div v-if="getDriverForCar(car)" class="driver-assigned">
+                      <button
+                        class="unseat-button"
+                        @click="handleUnseat(getDriverForCar(car)!.id)"
+                        :disabled="unseatingDriverId === getDriverForCar(car)?.id"
+                        title="Unseat driver"
+                      >
+                        {{ unseatingDriverId === getDriverForCar(car)?.id ? '...' : '×' }}
+                      </button>
+                      <div class="driver-header">
+                        <img
+                          v-if="getDriverForCar(car)?.avatar_url"
+                          :src="getDriverForCar(car)?.avatar_url"
+                          :alt="`${getDriverForCar(car)?.first_name} ${getDriverForCar(car)?.last_name} avatar`"
+                          class="driver-avatar"
+                        />
+                        <div class="driver-name">
+                          <h4>
+                            {{ getDriverForCar(car)?.first_name }}
+                            {{ getDriverForCar(car)?.last_name }}
+                          </h4>
+                          <span class="driver-nationality">{{
+                            getDriverForCar(car)?.nationality
+                          }}</span>
+                        </div>
+                      </div>
+                      <div class="driver-stats">
+                        <div class="stat-row">
+                          <span class="stat-label">Skill:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.skill_level.toFixed(1)
+                          }}</span>
+                        </div>
+                        <div class="stat-row">
+                          <span class="stat-label">Stamina:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.stamina.toFixed(1)
+                          }}</span>
+                        </div>
+                        <div class="stat-row">
+                          <span class="stat-label">Experience:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.experience.toFixed(1)
+                          }}</span>
+                        </div>
+                        <div class="stat-row">
+                          <span class="stat-label">Consistency:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.consistency.toFixed(1)
+                          }}</span>
+                        </div>
+                        <div class="stat-row">
+                          <span class="stat-label">Focus:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.focus.toFixed(1)
+                          }}</span>
+                        </div>
+                        <div class="stat-row">
+                          <span class="stat-label">Weather:</span>
+                          <span class="stat-value">{{
+                            getDriverForCar(car)?.weather_tolerance.toFixed(1)
+                          }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else class="empty-slot">
+                      <p>Drop a driver here</p>
                     </div>
                   </div>
-                  <div class="driver-stats">
-                    <div class="stat-row">
-                      <span class="stat-label">Skill:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.skill_level.toFixed(1) }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span class="stat-label">Stamina:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.stamina.toFixed(1) }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span class="stat-label">Experience:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.experience.toFixed(1) }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span class="stat-label">Consistency:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.consistency.toFixed(1) }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span class="stat-label">Focus:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.focus.toFixed(1) }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span class="stat-label">Weather:</span>
-                      <span class="stat-value">{{ getDriverForCar(car)?.weather_tolerance.toFixed(1) }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="empty-slot">
-                  <p>Drop a driver here</p>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Substitute Drivers Section -->
-          <div class="substitute-section">
-            <h4 class="section-title">Subs</h4>
-            <div class="subs-grid">
-              <div
-                v-for="subDriver in substituteDrivers"
-                :key="subDriver.id"
-                class="sub-driver-card"
-                draggable="true"
-                @dragstart="handleDragStart($event, subDriver.id)"
-                @dragend="handleDragEnd"
-              >
-                <div class="driver-header">
-                  <img
-                    v-if="subDriver.avatar_url"
-                    :src="subDriver.avatar_url"
-                    :alt="`${subDriver.first_name} ${subDriver.last_name} avatar`"
-                    class="driver-avatar"
-                  />
-                  <div class="driver-name">
-                    <h4>{{ subDriver.first_name }} {{ subDriver.last_name }}</h4>
-                    <span class="driver-nationality">{{ subDriver.nationality }}</span>
-                  </div>
-                </div>
-                <div class="driver-stats">
-                  <div class="stat-row">
-                    <span class="stat-label">Skill:</span>
-                    <span class="stat-value">{{ subDriver.skill_level.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Stamina:</span>
-                    <span class="stat-value">{{ subDriver.stamina.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Experience:</span>
-                    <span class="stat-value">{{ subDriver.experience.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Consistency:</span>
-                    <span class="stat-value">{{ subDriver.consistency.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Focus:</span>
-                    <span class="stat-value">{{ subDriver.focus.toFixed(1) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">Weather:</span>
-                    <span class="stat-value">{{ subDriver.weather_tolerance.toFixed(1) }}</span>
+              <!-- Substitute Drivers Section -->
+              <div class="substitute-section">
+                <h4 class="section-title">Subs</h4>
+                <div class="subs-grid">
+                  <div
+                    v-for="subDriver in substituteDrivers"
+                    :key="subDriver.id"
+                    class="sub-driver-card"
+                    draggable="true"
+                    @dragstart="handleDragStart($event, subDriver.id)"
+                    @dragend="handleDragEnd"
+                  >
+                    <div class="driver-header">
+                      <img
+                        v-if="subDriver.avatar_url"
+                        :src="subDriver.avatar_url"
+                        :alt="`${subDriver.first_name} ${subDriver.last_name} avatar`"
+                        class="driver-avatar"
+                      />
+                      <div class="driver-name">
+                        <h4>{{ subDriver.first_name }} {{ subDriver.last_name }}</h4>
+                        <span class="driver-nationality">{{ subDriver.nationality }}</span>
+                      </div>
+                    </div>
+                    <div class="driver-stats">
+                      <div class="stat-row">
+                        <span class="stat-label">Skill:</span>
+                        <span class="stat-value">{{ subDriver.skill_level.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Stamina:</span>
+                        <span class="stat-value">{{ subDriver.stamina.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Experience:</span>
+                        <span class="stat-value">{{ subDriver.experience.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Consistency:</span>
+                        <span class="stat-value">{{ subDriver.consistency.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Focus:</span>
+                        <span class="stat-value">{{ subDriver.focus.toFixed(1) }}</span>
+                      </div>
+                      <div class="stat-row">
+                        <span class="stat-label">Weather:</span>
+                        <span class="stat-value">{{ subDriver.weather_tolerance.toFixed(1) }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
             <!-- Loading lineup state -->
             <div v-if="loadingLineup" class="loading-message">Loading lineup...</div>
@@ -244,7 +292,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
-import { getMyTeam, createTeam, getTeamDrivers, getTeamCars, assignDriverToCar, type TeamDb, type CreateTeamRequest, type DriverDb, type CarDb } from '@/services/ApiService';
+import {
+  getMyTeam,
+  createTeam,
+  getTeamDrivers,
+  getTeamCars,
+  assignDriverToCar,
+  getTeamRegistrations,
+  unregisterFromRace,
+  type TeamDb,
+  type CreateTeamRequest,
+  type DriverDb,
+  type CarDb,
+  type RegistrationWithRaceDetails,
+} from '@/services/ApiService';
 
 const props = defineProps<{
   authenticated: boolean;
@@ -262,6 +323,10 @@ const loadingLineup = ref(false);
 const errorLineup = ref('');
 const draggedDriverId = ref<string | null>(null);
 const unseatingDriverId = ref<string | null>(null);
+const registeredRaces = ref<RegistrationWithRaceDetails[]>([]);
+const loadingRegistrations = ref(false);
+const errorRegistrations = ref('');
+const unregisteringRaceId = ref<string | null>(null);
 
 const formData = ref<CreateTeamRequest>({
   name: '',
@@ -276,12 +341,12 @@ const sortedCars = computed(() => {
 
 // Get substitute drivers (those without car_id)
 const substituteDrivers = computed(() => {
-  return drivers.value.filter(driver => driver.car_id === null);
+  return drivers.value.filter((driver) => driver.car_id === null);
 });
 
 // Helper function to get driver for a car
 function getDriverForCar(car: CarDb): DriverDb | undefined {
-  return drivers.value.find(driver => driver.car_id === car.id);
+  return drivers.value.find((driver) => driver.car_id === car.id);
 }
 
 function handleDragStart(event: DragEvent, driverId: string) {
@@ -325,10 +390,10 @@ async function handleDrop(event: DragEvent, carId: string) {
 
 async function handleUnseat(driverId: string) {
   unseatingDriverId.value = driverId;
-  
+
   // Save scroll position
   const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-  
+
   try {
     await assignDriverToCar(driverId, null);
     // Reload lineup to get updated data
@@ -351,11 +416,11 @@ async function handleUnseat(driverId: string) {
 async function loadTeam() {
   loading.value = true;
   error.value = '';
-  
+
   try {
     team.value = await getMyTeam();
     if (team.value) {
-      await loadLineup(team.value.id);
+      await Promise.all([loadLineup(team.value.id), loadRegistrations(team.value.id)]);
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load team';
@@ -365,10 +430,56 @@ async function loadTeam() {
   }
 }
 
+async function loadRegistrations(teamId: string) {
+  loadingRegistrations.value = true;
+  errorRegistrations.value = '';
+
+  try {
+    registeredRaces.value = await getTeamRegistrations(teamId);
+  } catch (err) {
+    errorRegistrations.value = err instanceof Error ? err.message : 'Failed to load registrations';
+    console.error('Error loading registrations:', err);
+  } finally {
+    loadingRegistrations.value = false;
+  }
+}
+
+async function handleUnregisterFromRace(raceId: string) {
+  unregisteringRaceId.value = raceId;
+
+  try {
+    await unregisterFromRace(raceId);
+    // Reload registrations and team to update UI
+    if (team.value) {
+      await loadRegistrations(team.value.id);
+      await loadTeam(); // Reload team to refresh data
+    }
+  } catch (err) {
+    errorRegistrations.value =
+      err instanceof Error ? err.message : 'Failed to unregister from race';
+    console.error('Error unregistering from race:', err);
+  } finally {
+    unregisteringRaceId.value = null;
+  }
+}
+
+function formatRaceDate(startDatetime: string | null): string {
+  if (!startDatetime) return 'Date TBD';
+  const date = new Date(startDatetime);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 async function loadLineup(teamId: string) {
   loadingLineup.value = true;
   errorLineup.value = '';
-  
+
   try {
     const [teamDrivers, teamCars] = await Promise.all([
       getTeamDrivers(teamId),
@@ -394,7 +505,7 @@ async function handleCreateTeam() {
     };
 
     await createTeam(request);
-    
+
     // Reset form
     formData.value = {
       name: '',
@@ -413,19 +524,23 @@ async function handleCreateTeam() {
 }
 
 // Watch for authentication changes and reload team when user logs in
-watch(() => props.authenticated, (newAuth) => {
-  if (newAuth) {
-    // User just logged in, reload team data
-    loadTeam();
-  } else {
-    // User logged out, clear team data
-    team.value = null;
-    drivers.value = [];
-    cars.value = [];
-    error.value = '';
-    loading.value = false;
-  }
-});
+watch(
+  () => props.authenticated,
+  (newAuth) => {
+    if (newAuth) {
+      // User just logged in, reload team data
+      loadTeam();
+    } else {
+      // User logged out, clear team data
+      team.value = null;
+      drivers.value = [];
+      cars.value = [];
+      registeredRaces.value = [];
+      error.value = '';
+      loading.value = false;
+    }
+  },
+);
 
 onMounted(() => {
   // Only load team if authenticated
@@ -511,9 +626,9 @@ label {
   font-weight: 500;
 }
 
-input[type="text"],
-input[type="number"],
-input[type="color"] {
+input[type='text'],
+input[type='number'],
+input[type='color'] {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
@@ -522,7 +637,7 @@ input[type="color"] {
   box-sizing: border-box;
 }
 
-input[type="color"] {
+input[type='color'] {
   height: 50px;
   cursor: pointer;
 }
@@ -580,7 +695,9 @@ button:disabled {
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   width: 100%;
   position: sticky;
   top: 2rem;
@@ -636,6 +753,104 @@ button:disabled {
   object-fit: contain;
 }
 
+.upcoming-races-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+.section-title-small {
+  color: #2d4059;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  margin-top: 0;
+}
+
+.loading-small,
+.error-small {
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.loading-small {
+  color: #666;
+}
+
+.error-small {
+  color: #d32f2f;
+}
+
+.no-races {
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+  padding: 1rem;
+}
+
+.races-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.race-card-small {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+}
+
+.race-card-line-1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.race-track-name {
+  font-weight: 500;
+  color: #1a1a2e;
+  font-size: 0.95rem;
+}
+
+.race-laps {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.race-card-line-2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.race-date {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.btn-unregister {
+  padding: 0.35rem 0.75rem;
+  background-color: #f57c00;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-unregister:hover:not(:disabled) {
+  background-color: #e65100;
+}
+
+.btn-unregister:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
 .lineup-section {
   width: 100%;
 }
@@ -670,7 +885,10 @@ button:disabled {
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
   border: 3px solid #e0e0e0;
   min-height: 200px;
 }
@@ -738,7 +956,9 @@ button:disabled {
   font-weight: bold;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.2s;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -812,7 +1032,9 @@ button:disabled {
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   border-left: 4px solid #ff9800;
   cursor: move;
 }
@@ -846,4 +1068,3 @@ button:disabled {
   }
 }
 </style>
-

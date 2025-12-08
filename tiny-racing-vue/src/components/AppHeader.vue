@@ -16,12 +16,13 @@ const emit = defineEmits<{
 const navigationLinks = computed(() => [
   { name: 'Game', view: 'game', requiresAuth: false },
   { name: 'My Team', view: 'my-team', requiresAuth: true },
-  { name: 'Market', view: 'market', requiresAuth: true },
+  { name: 'All Teams', view: 'all-teams', requiresAuth: false },
   { name: 'Races', view: 'races', requiresAuth: false },
+  { name: 'Market', view: 'market', requiresAuth: true },
 ]);
 
-const visibleLinks = computed(() => 
-  navigationLinks.value.filter(link => !link.requiresAuth || props.authenticated)
+const visibleLinks = computed(() =>
+  navigationLinks.value.filter((link) => !link.requiresAuth || props.authenticated),
 );
 
 function handleNavigate(view: string) {
@@ -59,17 +60,11 @@ function handleLogout() {
       <!-- Auth actions on the right -->
       <div class="auth-actions">
         <template v-if="!authenticated">
-          <button class="btn btn-secondary" @click="handleRegister">
-            Register
-          </button>
-          <button class="btn btn-primary" @click="handleLogin">
-            Login
-          </button>
+          <button class="btn btn-secondary" @click="handleRegister">Register</button>
+          <button class="btn btn-primary" @click="handleLogin">Login</button>
         </template>
         <template v-else>
-          <button class="btn btn-logout" @click="handleLogout">
-            Logout
-          </button>
+          <button class="btn btn-logout" @click="handleLogout">Logout</button>
         </template>
       </div>
     </div>
@@ -198,4 +193,3 @@ function handleLogout() {
   }
 }
 </style>
-
