@@ -24,6 +24,7 @@
 //! // svg is now a String containing the SVG XML
 //! ```
 
+
 use chrono::NaiveDate;
 
 /// Generates a deterministic seed string from driver information
@@ -40,7 +41,10 @@ fn string_to_hash_code(s: &str) -> u32 {
     for byte in s.bytes() {
         // Use wrapping arithmetic to match JavaScript's behavior
         // In JavaScript, integer operations wrap around at 32-bit boundaries
-        hash = hash.wrapping_shl(5).wrapping_sub(hash).wrapping_add(byte as i32);
+        hash = hash
+            .wrapping_shl(5)
+            .wrapping_sub(hash)
+            .wrapping_add(byte as i32);
         hash |= 0; // Convert to 32bit integer (no-op in Rust, but kept for clarity)
     }
     // Convert to u32 using abs, handling i32::MIN case
@@ -52,74 +56,28 @@ fn string_to_hash_code(s: &str) -> u32 {
     }
 }
 
-// /// Hair colors
-// const HAIR_COLORS: [&str; 10] = [
-//     "#2C1810", // Black
-//     "#3D2817", // Dark brown
-//     "#654321", // Brown
-//     "#8B4513", // Light brown
-//     "#A0522D", // Sandy brown
-//     "#D2691E", // Carrot
-//     "#FFDBAC", // Blonde
-//     "#F5DEB3", // Light blonde
-//     "#FFFAF0", // Platinum
-//     "#708090", // Gray/silver
-// ];
-
-// /// Eye colors
-// const EYE_COLORS: [&str; 6] = [
-//     "#1A1A1A", // Dark brown/black
-//     "#654321", // Brown
-//     "#8B4513", // Light brown
-//     "#4169E1", // Blue
-//     "#228B22", // Green
-//     "#9370DB", // Hazel
-// ];
-
-// /// Background colors for the avatar circle
-// const BG_COLORS: [&str; 12] = [
-//     "#FF6B9D", // Bright pink
-//     "#C9F4FF", // Bright cyan/teal
-//     "#FFE66D", // Bright yellow
-//     "#A8E6CF", // Mint green
-//     "#FFB347", // Orange
-//     "#B19CD9", // Light purple
-//     "#FFCCCB", // Light red
-//     "#ADD8E6", // Light blue
-//     "#DDA0DD", // Plum
-//     "#98D8C8", // Turquoise
-//     "#F7DC6F", // Light yellow
-//     "#F8B88B", // Peach
-// ];
-
-// /// Hair styles
-// #[derive(Debug, Clone, Copy)]
-// enum HairStyle {
-//     Short,
-//     Medium,
-//     Long,
-//     Curly,
-//     Wavy,
-//     Bun,
-//     Ponytail,
-//     SidePart,
-//     Spiky,
-//     Bald,
-// }
-
-
 
 
 
 // Default options matching React's defaultOptions
 const DEFAULT_SEX: &[&str] = &["man", "woman"];
-const DEFAULT_FACE_COLOR: &[&str] = &["#F9C9B6", "#AC6651"];
+const DEFAULT_FACE_COLOR: &[&str] = &["#F3D1B0",
+"#E2B792",
+"#C99677",
+"#B07D62",
+"#8D5B39",
+"#6D3E21",];
 const DEFAULT_EAR_SIZE: &[&str] = &["small", "big"];
-const DEFAULT_HAIR_COLOR: &[&str] = &["#000", "#fff", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150"];
+const DEFAULT_HAIR_COLOR: &[&str] = &[
+    "#000", "#fff", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150", "#2C1810", "#3D2817",
+    "#654321", "#8B4513", "#A0522D", "#D2691E", "#FFDBAC", "#F5DEB3", "#FFFAF0", "#708090",
+];
 const DEFAULT_HAIR_STYLE_MAN: &[&str] = &["normal", "thick", "mohawk"];
 const DEFAULT_HAIR_STYLE_WOMAN: &[&str] = &["normal", "womanLong", "womanShort"];
-const DEFAULT_HAT_COLOR: &[&str] = &["#000", "#fff", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150"];
-const DEFAULT_HAT_STYLE: &[&str] = &["beanie", "turban", "none"];
+const DEFAULT_HAT_COLOR: &[&str] = &[
+    "#000", "#fff", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150",
+];
+const DEFAULT_HAT_STYLE: &[&str] = &["beanie", "none"];
 const DEFAULT_EYEBROW_WOMAN: &[&str] = &["up", "upWoman"];
 const DEFAULT_EYE_STYLE: &[&str] = &["circle", "oval", "smile"];
 const DEFAULT_GLASSES_STYLE: &[&str] = &["round", "square", "none"];
@@ -127,12 +85,15 @@ const DEFAULT_NOSE_STYLE: &[&str] = &["short", "long", "round"];
 const DEFAULT_MOUTH_STYLE: &[&str] = &["laugh", "smile", "peace"];
 const DEFAULT_SHIRT_STYLE: &[&str] = &["hoody", "short", "polo"];
 const DEFAULT_SHIRT_COLOR: &[&str] = &["#9287FF", "#6BD9E9", "#FC909F", "#F4D150", "#77311D"];
-const DEFAULT_BG_COLOR: &[&str] = &["#9287FF", "#6BD9E9", "#FC909F", "#F4D150", "#E0DDFF", "#D2EFF3", "#FFEDEF", "#FFEBA4", "#506AF4", "#F48150", "#74D153"];
+const DEFAULT_BG_COLOR: &[&str] = &[
+    "#9287FF", "#6BD9E9", "#FC909F", "#F4D150", "#E0DDFF", "#D2EFF3", "#FFEDEF", "#FFEBA4",
+    "#506AF4", "#F48150", "#74D153", "#FF6B9D", "#C9F4FF", "#FFE66D", "#A8E6CF", "#FFB347",
+    "#B19CD9", "#FFCCCB", "#ADD8E6", "#DDA0DD", "#98D8C8", "#F7DC6F", "#F8B88B",
+];
 
 /// Avatar configuration matching React's AvatarFullConfig
 #[derive(Debug, Clone)]
 struct AvatarConfig {
-    sex: String,
     face_color: String,
     ear_size: String,
     hair_color: String,
@@ -157,7 +118,7 @@ fn pick_by_hash_code(code: u32, options: &[&str], avoid_list: &[&str], usually: 
         .filter(|&opt| !avoid_list.contains(opt))
         .copied()
         .collect();
-    
+
     // Increase selecting possibility of usually options (add 15x each)
     let mut weighted: Vec<&str> = usually
         .iter()
@@ -165,11 +126,11 @@ fn pick_by_hash_code(code: u32, options: &[&str], avoid_list: &[&str], usually: 
         .copied()
         .collect();
     weighted.extend_from_slice(&filtered);
-    
+
     if weighted.is_empty() {
         return options[0].to_string();
     }
-    
+
     let index = (code as usize) % weighted.len();
     weighted[index].to_string()
 }
@@ -177,7 +138,7 @@ fn pick_by_hash_code(code: u32, options: &[&str], avoid_list: &[&str], usually: 
 /// Generate avatar configuration from seed string (matching React's genConfig)
 fn gen_config(seed: &str) -> AvatarConfig {
     let hash_code = string_to_hash_code(seed);
-    
+
     // Generate base config
     let sex = pick_by_hash_code(hash_code, DEFAULT_SEX, &[], &[]);
     let face_color = pick_by_hash_code(hash_code, DEFAULT_FACE_COLOR, &[], &[]);
@@ -187,47 +148,57 @@ fn gen_config(seed: &str) -> AvatarConfig {
     let mouth_style = pick_by_hash_code(hash_code, DEFAULT_MOUTH_STYLE, &[], &[]);
     let shirt_style = pick_by_hash_code(hash_code, DEFAULT_SHIRT_STYLE, &[], &[]);
     let glasses_style = pick_by_hash_code(hash_code, DEFAULT_GLASSES_STYLE, &[], &["none"]);
-    
+
     // Hair color with special logic
-    let hair_color_avoid_list: Vec<&str> = if sex == "woman" && face_color == DEFAULT_FACE_COLOR[1] {
+    let hair_color_avoid_list: Vec<&str> = if sex == "woman" && face_color == DEFAULT_FACE_COLOR[1]
+    {
         vec!["#77311D"]
     } else {
         vec![]
     };
-    let hair_color_usually: Vec<&str> = if sex == "man" {
-        vec!["#000"]
-    } else {
-        vec![]
-    };
-    let hair_color = pick_by_hash_code(hash_code, DEFAULT_HAIR_COLOR, &hair_color_avoid_list, &hair_color_usually);
-    
+    let hair_color_usually: Vec<&str> = if sex == "man" { vec!["#000"] } else { vec![] };
+    let hair_color = pick_by_hash_code(
+        hash_code,
+        DEFAULT_HAIR_COLOR,
+        &hair_color_avoid_list,
+        &hair_color_usually,
+    );
+
     // Hair style based on sex
     let hair_style = if sex == "man" {
         pick_by_hash_code(hash_code, DEFAULT_HAIR_STYLE_MAN, &[], &["normal", "thick"])
     } else {
         pick_by_hash_code(hash_code, DEFAULT_HAIR_STYLE_WOMAN, &[], &[])
     };
-    
+
     // Hat
     let hat_style = pick_by_hash_code(hash_code, DEFAULT_HAT_STYLE, &[], &["none"]);
     let hat_color = pick_by_hash_code(hash_code, DEFAULT_HAT_COLOR, &[], &[]);
-    let hair_or_hat_color = if hat_style == "none" { &hair_color } else { &hat_color };
-    
+    let hair_or_hat_color = if hat_style == "none" {
+        &hair_color
+    } else {
+        &hat_color
+    };
+
     // Eyebrow
     let eye_brow_style = if sex == "woman" {
         pick_by_hash_code(hash_code, DEFAULT_EYEBROW_WOMAN, &[], &[])
     } else {
         "up".to_string()
     };
-    
+
     // Shirt color (avoid hair/hat color)
     let shirt_color = pick_by_hash_code(hash_code, DEFAULT_SHIRT_COLOR, &[hair_or_hat_color], &[]);
-    
+
     // Background color (avoid hair/hat color and shirt color)
-    let bg_color = pick_by_hash_code(hash_code, DEFAULT_BG_COLOR, &[hair_or_hat_color, &shirt_color], &[]);
-    
+    let bg_color = pick_by_hash_code(
+        hash_code,
+        DEFAULT_BG_COLOR,
+        &[hair_or_hat_color, &shirt_color],
+        &[],
+    );
+
     AvatarConfig {
-        sex,
         face_color,
         ear_size,
         hair_color,
@@ -245,10 +216,9 @@ fn gen_config(seed: &str) -> AvatarConfig {
     }
 }
 
-
-
 fn big_ears(color: &str) -> String {
-    format!(r#"<svg
+    format!(
+        r##"<svg
     style="position: absolute; width: 16%; height: 15%; top: 13%; left: 19%"
     width="48"
     height="52"
@@ -257,24 +227,29 @@ fn big_ears(color: &str) -> String {
     xmlns="http://www.w3.org/2000/svg">
     <path d="M36.466 43.1111L37 42.5357V41.7506V8.24948V7.13022L36.046 6.54483C32.3122 4.25363 27.7717 3 23.08 3C17.4397 3 12.1591 4.74745 8.39775 8.29504C4.59419 11.8824 2.54206 17.1274 3.08692 23.6661C3.61786 30.0378 5.75693 34.7272 9.30474 37.8433C9.01338 38.8425 8.92733 39.9197 9.06236 41.0533C9.45166 44.3216 11.1039 46.6766 13.6572 48.1277C16.0911 49.511 19.2061 49.9998 22.5242 49.9998C28.0033 49.9998 32.8077 47.0528 36.466 43.1111Z" stroke="black" stroke-width="4" />
     <path fill-rule="evenodd" clip-rule="evenodd" d="M42.972 23.984C43.0434 23.3322 43.08 22.6703 43.08 22C43.08 11.7827 33.5734 5 23.08 5C12.5866 5 4.08007 11.5 5.08001 23.5C5.63643 30.1774 8.02584 34.5719 11.7307 37.2171C11.1423 38.2409 10.8848 39.4436 11.0483 40.8167C11.6774 46.0984 16.1862 47.9998 22.5242 47.9998C33.6292 47.9998 42.4159 33.9534 42.972 23.984Z" fill="{}" /> 
-    <path d="M27.5 13.5004C23.5 11.6671 14.7 10.7004 11.5 21.5004" stroke="{{#}}171921" stroke-width="4" />
-    <path d="M17 14C19.1667 15.8333 23.3 21.5 22.5 29.5" stroke="{{#}}171921" stroke-width="4" />
-  </svg>"#, color)
+    <path d="M27.5 13.5004C23.5 11.6671 14.7 10.7004 11.5 21.5004" stroke="#171921" stroke-width="4" />
+    <path d="M17 14C19.1667 15.8333 23.3 21.5 22.5 29.5" stroke="#171921" stroke-width="4" />
+  </svg>"##,
+        color
+    )
 }
 
 fn small_ears(color: &str) -> String {
-    format!(r#"<svg
+    format!(
+        r##"<svg
       style="position: absolute; width: 16%; height: 15%; top: 13%; left: 19.8%"
       width="48"
       height="48"
       viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg">
-      <path d="M30.5 6.17556C28.17 5.40834 25.6547 5 23.08 5C12.5866 5 4.08007 11.5 5.08001 23.5C6.12162 36 13.5866 40.5 24.08 40.5C25.2476 40.5 26.3906 40.3975 27.5 40.2011C28.7105 39.9869 29.8811 39.6609 31 39.2347" stroke="{{#}}171921" stroke-width="9" />
+      <path d="M30.5 6.17556C28.17 5.40834 25.6547 5 23.08 5C12.5866 5 4.08007 11.5 5.08001 23.5C6.12162 36 13.5866 40.5 24.08 40.5C25.2476 40.5 26.3906 40.3975 27.5 40.2011C28.7105 39.9869 29.8811 39.6609 31 39.2347" stroke="#171921" stroke-width="9" />
       <path d="M31.5 39.0361C29.2204 39.9786 26.7127 40.5 24.08 40.5C13.5866 40.5 6.12162 36 5.08001 23.5C4.08007 11.5 12.5866 5 23.08 5C26.2175 5 29.2667 5.60635 32 6.72957L31.5 39.0361Z" fill="{}" />
-      <path d="M27.5 13.5004C23.5 11.6671 14.7 10.7004 11.5 21.5004" stroke="{{#}}171921" stroke-width="4" />
-      <path d="M17 14C19.1667 15.8333 23.3 21.5 22.5 29.5" stroke="{{#}}171921" stroke-width="4" />
-    </svg>"#, color)
+      <path d="M27.5 13.5004C23.5 11.6671 14.7 10.7004 11.5 21.5004" stroke="#171921" stroke-width="4" />
+      <path d="M17 14C19.1667 15.8333 23.3 21.5 22.5 29.5" stroke="#171921" stroke-width="4" />
+    </svg>"##,
+        color
+    )
 }
 
 fn eyebrow_up() -> &'static str {
@@ -340,21 +315,22 @@ fn eyes_oval() -> &'static str {
 }
 
 fn eyes_smile() -> &'static str {
-    r#"<svg
+    r##"<svg
       style="width: 100%; height: 14%; position: absolute; top: 6%"
       width="96"
       height="48"
       viewBox="0 0 96 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M5.28675 34.0729C5.40099 34.8857 6.43424 35.0669 7.00876 34.4806C9.47388 31.9648 13.2637 30.1163 17.663 29.5936C20.2577 29.2853 22.7544 29.4749 24.9787 30.0657C25.7326 30.2659 26.4737 29.6294 26.2105 28.8951C24.5451 24.2497 19.8447 21.1962 14.7356 21.8033C8.79442 22.5093 4.55046 27.8978 5.25642 33.839C5.26572 33.9172 5.27583 33.9952 5.28675 34.0729Z" fill="{{#}}171921" />
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M69.3848 24.0725C69.4976 24.8856 70.5308 25.0671 71.1062 24.4816C73.5487 21.9959 77.2977 20.1702 81.6484 19.6532C84.2128 19.3485 86.6804 19.5348 88.88 20.1167C89.6341 20.3162 90.3751 19.6795 90.1108 18.9456C88.456 14.3522 83.8041 11.3346 78.7482 11.9354C72.8624 12.6348 68.6579 17.9732 69.3573 23.8591C69.3658 23.9305 69.3749 24.0016 69.3848 24.0725Z" fill="{{#}}171921" />
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M5.28675 34.0729C5.40099 34.8857 6.43424 35.0669 7.00876 34.4806C9.47388 31.9648 13.2637 30.1163 17.663 29.5936C20.2577 29.2853 22.7544 29.4749 24.9787 30.0657C25.7326 30.2659 26.4737 29.6294 26.2105 28.8951C24.5451 24.2497 19.8447 21.1962 14.7356 21.8033C8.79442 22.5093 4.55046 27.8978 5.25642 33.839C5.26572 33.9172 5.27583 33.9952 5.28675 34.0729Z" fill="#171921" />
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M69.3848 24.0725C69.4976 24.8856 70.5308 25.0671 71.1062 24.4816C73.5487 21.9959 77.2977 20.1702 81.6484 19.6532C84.2128 19.3485 86.6804 19.5348 88.88 20.1167C89.6341 20.3162 90.3751 19.6795 90.1108 18.9456C88.456 14.3522 83.8041 11.3346 78.7482 11.9354C72.8624 12.6348 68.6579 17.9732 69.3573 23.8591C69.3658 23.9305 69.3749 24.0016 69.3848 24.0725Z" fill="#171921" />
     </svg>
-  "#
+  "##
 }
 
 fn face(color: &str) -> String {
-    format!(r#"<svg
+    format!(
+        r#"<svg
       style="width: 100%; height: 100%; left: 0; top: 0; position: absolute"
       width="200"
       height="320"
@@ -380,7 +356,9 @@ fn face(color: &str) -> String {
           <rect width="200" height="320" fill="white" />
         </clipPath>
       </defs>
-    </svg>"#, color, color, color)
+    </svg>"#,
+        color, color, color
+    )
 }
 
 fn glasses_round() -> &'static str {
@@ -432,7 +410,6 @@ fn hair_mohawk(color: &str, subcolor: &str) -> String {
         color, subcolor
     )
 }
-
 
 fn hair_normal(color: &str) -> String {
     // If color is empty, fallback to #171921
@@ -489,7 +466,6 @@ fn hair_woman_long(color: &str) -> String {
     )
 }
 
-
 fn hair_woman_short(color: &str) -> String {
     // If color is empty, fallback to "black"
     let fill_color = if color.is_empty() { "black" } else { color };
@@ -507,10 +483,13 @@ fn hair_woman_short(color: &str) -> String {
     )
 }
 
-
 fn hat_beanie(color: &str) -> String {
     // The hat color for the hat's outline/stripe: If color is #000000, use "dimgray", else use "#000000"
-    let hat_line_color = if color == "#000000" { "dimgray" } else { "#000000" };
+    let hat_line_color = if color == "#000000" {
+        "dimgray"
+    } else {
+        "#000000"
+    };
 
     format!(
         r#"<svg
@@ -556,7 +535,6 @@ fn hat_turban(color: &str) -> String {
         color = color,
     )
 }
-  
 
 // Returns a SVG string for the "mouthLaugh" mouth SVG component.
 fn mouth_laugh_svg() -> String {
@@ -613,11 +591,11 @@ fn mouth_smile_svg() -> String {
     )
 }
 
-
 // Returns a SVG string for the "noseLong" nose SVG component.
 fn nose_long_svg() -> String {
     const HASH: &str = "#";
-    format!(r#"<svg
+    format!(
+        r#"<svg
     style="width:10%;height:10%;position:absolute;top:15%;left:46%;"
     width="32"
     height="40"
@@ -625,10 +603,10 @@ fn nose_long_svg() -> String {
     fill="none"
     xmlns="http://www.w3.org/2000/svg">
     <path d="M16.5 3C16.5 17 23.5 28 23.5 28C23.5 28 20 34 10 32" stroke="{}{}171921" stroke-width="4" />
-</svg>"#, HASH, "")
+</svg>"#,
+        HASH, ""
+    )
 }
-  
-
 
 // Returns a SVG string for the "noseRound" nose SVG component.
 fn nose_round_svg() -> String {
@@ -643,11 +621,11 @@ fn nose_round_svg() -> String {
 </svg>"#.to_string()
 }
 
-
 // Returns a SVG string for the "noseShort" nose SVG component.
 fn nose_short_svg() -> String {
     const HASH: &str = "#";
-    format!(r#"<svg
+    format!(
+        r#"<svg
     style="width:10%;height:10%;position:absolute;top:15%;left:46%;"
     width="32"
     height="40"
@@ -655,7 +633,9 @@ fn nose_short_svg() -> String {
     fill="none"
     xmlns="http://www.w3.org/2000/svg">
     <path d="M16.5 7C16.1667 10.8333 16.5 19.2 20.5 22C25.5 25.5 20 34 10 32" stroke="{}{}171921" stroke-width="4" />
-</svg>"#, HASH, "")
+</svg>"#,
+        HASH, ""
+    )
 }
 
 // Returns a SVG string for the "Hoodie" shirt SVG component with customizable colors.
@@ -708,127 +688,16 @@ fn shirt_short_svg(color: &str) -> String {
 </svg>"#
     )
 }
-  
-  
-
-/// Extract inner content from an SVG string (everything between <svg> and </svg>)
-fn extract_svg_content(svg_str: &str) -> String {
-    // Find the content between <svg...> and </svg>
-    if let Some(start) = svg_str.find('>') {
-        if let Some(end) = svg_str.rfind("</svg>") {
-            return svg_str[start + 1..end].to_string();
-        }
-    }
-    svg_str.to_string()
-}
-
-/// Helper function to get hair SVG content (without outer SVG tags)
-fn get_hair_svg(style: &str, color: &str) -> String {
-    let full_svg = match style {
-        "normal" => hair_normal(color),
-        "thick" => hair_thick(color),
-        "mohawk" => {
-            // For mohawk, we need a subcolor (lighter version)
-            let subcolor = if color == "#000" { "#333" } else { "#fff" };
-            hair_mohawk(color, subcolor)
-        }
-        "womanLong" => hair_woman_long(color),
-        "womanShort" => hair_woman_short(color),
-        _ => hair_normal(color),
-    };
-    extract_svg_content(&full_svg)
-}
-
-/// Helper function to get hat SVG content (without outer SVG tags)
-fn get_hat_svg(style: &str, color: &str) -> Option<String> {
-    match style {
-        "beanie" => Some(extract_svg_content(&hat_beanie(color))),
-        "turban" => Some(extract_svg_content(&hat_turban(color))),
-        "none" => None,
-        _ => None,
-    }
-}
-
-/// Helper function to get eyebrow SVG content (without outer SVG tags)
-fn get_eyebrow_svg(style: &str) -> String {
-    let full_svg = match style {
-        "up" => eyebrow_up(),
-        "upWoman" => eyebrow_up_woman(),
-        _ => eyebrow_up(),
-    };
-    extract_svg_content(full_svg)
-}
-
-/// Helper function to get eye SVG content (without outer SVG tags)
-fn get_eye_svg(style: &str) -> String {
-    let full_svg = match style {
-        "circle" => eyes_circle(),
-        "oval" => eyes_oval(),
-        "smile" => eyes_smile(),
-        _ => eyes_circle(),
-    };
-    extract_svg_content(full_svg)
-}
-
-/// Helper function to get glasses SVG content (without outer SVG tags)
-fn get_glasses_svg(style: &str) -> Option<String> {
-    match style {
-        "round" => Some(extract_svg_content(glasses_round())),
-        "square" => Some(extract_svg_content(glasses_square())),
-        "none" => None,
-        _ => None,
-    }
-}
-
-/// Helper function to get nose SVG content (without outer SVG tags)
-fn get_nose_svg(style: &str) -> String {
-    let full_svg = match style {
-        "short" => nose_short_svg(),
-        "long" => nose_long_svg(),
-        "round" => nose_round_svg(),
-        _ => nose_short_svg(),
-    };
-    extract_svg_content(&full_svg)
-}
-
-/// Helper function to get mouth SVG content (without outer SVG tags)
-fn get_mouth_svg(style: &str) -> String {
-    let full_svg = match style {
-        "laugh" => mouth_laugh_svg(),
-        "smile" => mouth_smile_svg(),
-        "peace" => mouth_peace_svg(),
-        _ => mouth_smile_svg(),
-    };
-    extract_svg_content(&full_svg)
-}
-
-/// Helper function to get shirt SVG content (without outer SVG tags)
-fn get_shirt_svg(style: &str, color: &str) -> String {
-    // Calculate light color for shirts that need it
-    let light_color = if color == "#000" { "#333" } else { "#fff" };
-    
-    let full_svg = match style {
-        "hoody" => shirt_hoody_svg(color, light_color),
-        "polo" => shirt_polo_svg(color, light_color),
-        "short" => shirt_short_svg(color),
-        _ => shirt_short_svg(color),
-    };
-    extract_svg_content(&full_svg)
-}
 
 /// Generates an SVG avatar for a driver based on their name, gender, and date of birth
 /// This matches the React component's render() method behavior
 /// The React component uses CSS positioning which doesn't work in SVG, so we use foreignObject
 /// to embed HTML with CSS, which allows the exact same rendering behavior
-pub fn generate_driver_avatar(
-    name: &str,
-    gender: &str,
-    date_of_birth: &NaiveDate,
-) -> String {
+pub fn generate_driver_avatar(name: &str, gender: &str, date_of_birth: &NaiveDate) -> String {
     // Generate seed string and config (matching React's genConfig)
     let seed_string = generate_seed_string(name, gender, date_of_birth);
     let config = gen_config(&seed_string);
-    
+
     // Build the React component structure using foreignObject to embed HTML
     // This allows us to use the exact same CSS positioning as React
     let mut svg = format!(
@@ -845,10 +714,10 @@ pub fn generate_driver_avatar(
           <div style="position: absolute; bottom: 0; width: 100%; height: 90%;">"#,
         config.bg_color
     );
-    
+
     // Face component (rendered first)
     svg.push_str(&face(&config.face_color));
-    
+
     // Hat component (if not "none")
     if config.hat_style != "none" {
         // Reconstruct full SVG for hat
@@ -859,14 +728,18 @@ pub fn generate_driver_avatar(
         };
         svg.push_str(&hat_full);
     }
-    
+
     // Hair component (only if hatStyle === "none")
     if config.hat_style == "none" {
         let hair_full = match config.hair_style.as_str() {
             "normal" => hair_normal(&config.hair_color),
             "thick" => hair_thick(&config.hair_color),
             "mohawk" => {
-                let subcolor = if config.hair_color == "#000" { "#333" } else { "#fff" };
+                let subcolor = if config.hair_color == "#000" {
+                    "#333"
+                } else {
+                    "#fff"
+                };
                 hair_mohawk(&config.hair_color, subcolor)
             }
             "womanLong" => hair_woman_long(&config.hair_color),
@@ -875,10 +748,10 @@ pub fn generate_driver_avatar(
         };
         svg.push_str(&hair_full);
     }
-    
+
     // Face detail container (matching React's positioning)
     svg.push_str(r#"<div style="position: absolute; right: -3%; top: 30%; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">"#);
-    
+
     // Eyebrow
     let eyebrow_full = match config.eye_brow_style.as_str() {
         "up" => eyebrow_up(),
@@ -886,7 +759,7 @@ pub fn generate_driver_avatar(
         _ => eyebrow_up(),
     };
     svg.push_str(eyebrow_full);
-    
+
     // Eye
     let eye_full = match config.eye_style.as_str() {
         "circle" => eyes_circle(),
@@ -895,7 +768,7 @@ pub fn generate_driver_avatar(
         _ => eyes_circle(),
     };
     svg.push_str(eye_full);
-    
+
     // Glasses (if not "none")
     if config.glasses_style != "none" {
         let glasses_full = match config.glasses_style.as_str() {
@@ -905,14 +778,14 @@ pub fn generate_driver_avatar(
         };
         svg.push_str(glasses_full);
     }
-    
+
     // Ear
     if config.ear_size == "big" {
         svg.push_str(&big_ears(&config.face_color));
     } else {
         svg.push_str(&small_ears(&config.face_color));
     }
-    
+
     // Nose
     let nose_full = match config.nose_style.as_str() {
         "short" => nose_short_svg(),
@@ -921,7 +794,7 @@ pub fn generate_driver_avatar(
         _ => nose_short_svg(),
     };
     svg.push_str(&nose_full);
-    
+
     // Mouth
     let mouth_full = match config.mouth_style.as_str() {
         "laugh" => mouth_laugh_svg(),
@@ -930,12 +803,16 @@ pub fn generate_driver_avatar(
         _ => mouth_smile_svg(),
     };
     svg.push_str(&mouth_full);
-    
+
     // Close face detail container
     svg.push_str("</div>");
-    
+
     // Shirt component
-    let light_color = if config.shirt_color == "#000" { "#333" } else { "#fff" };
+    let light_color = if config.shirt_color == "#000" {
+        "#333"
+    } else {
+        "#fff"
+    };
     let shirt_full = match config.shirt_style.as_str() {
         "hoody" => shirt_hoody_svg(&config.shirt_color, light_color),
         "polo" => shirt_polo_svg(&config.shirt_color, light_color),
@@ -943,10 +820,10 @@ pub fn generate_driver_avatar(
         _ => shirt_short_svg(&config.shirt_color),
     };
     svg.push_str(&shirt_full);
-    
+
     // Close all divs and foreignObject
     svg.push_str("</div></div></div></foreignObject></g></svg>");
-    
+
     svg
 }
 
@@ -959,29 +836,28 @@ mod tests {
     fn test_generate_avatar() {
         let dob = NaiveDate::from_ymd_opt(1995, 5, 15).unwrap();
         let svg = generate_driver_avatar("Max Verstappen", "male", &dob);
-        
+
         assert!(svg.contains("<svg"));
         assert!(svg.contains("xmlns"));
     }
-    
+
     #[test]
     fn test_deterministic_generation() {
         let dob = NaiveDate::from_ymd_opt(1995, 5, 15).unwrap();
         let svg1 = generate_driver_avatar("Test Driver", "male", &dob);
         let svg2 = generate_driver_avatar("Test Driver", "male", &dob);
-        
+
         assert_eq!(svg1, svg2);
     }
-    
+
     #[test]
     fn test_different_drivers_different_avatars() {
         let dob1 = NaiveDate::from_ymd_opt(1995, 5, 15).unwrap();
         let dob2 = NaiveDate::from_ymd_opt(1995, 5, 16).unwrap();
-        
+
         let svg1 = generate_driver_avatar("Driver One", "male", &dob1);
         let svg2 = generate_driver_avatar("Driver Two", "male", &dob2);
-        
+
         assert_ne!(svg1, svg2);
     }
 }
-

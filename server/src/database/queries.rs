@@ -1,7 +1,7 @@
 use super::models::*;
+use crate::auth::hash_password;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::auth::hash_password;
 
 // ========== Team Queries ==========
 
@@ -14,7 +14,7 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
         let max_number: Option<i32> = sqlx::query_scalar("SELECT MAX(number) FROM team")
             .fetch_optional(pool)
             .await?;
-        
+
         max_number.map(|n| n + 1).unwrap_or(1)
     };
 
@@ -37,7 +37,8 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
         INSERT INTO team (number, name, logo, color, pit_efficiency, cash, player_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
-        "#)
+        "#,
+    )
     .bind(team_number)
     .bind(request.name)
     .bind(request.logo)
@@ -77,16 +78,23 @@ pub async fn list_teams(pool: &PgPool) -> Result<Vec<TeamDb>, sqlx::Error> {
     Ok(teams)
 }
 
-pub async fn list_teams_by_player(pool: &PgPool, player_id: Uuid) -> Result<Vec<TeamDb>, sqlx::Error> {
-    let teams = sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 ORDER BY number")
-        .bind(player_id)
-        .fetch_all(pool)
-        .await?;
+pub async fn list_teams_by_player(
+    pool: &PgPool,
+    player_id: Uuid,
+) -> Result<Vec<TeamDb>, sqlx::Error> {
+    let teams =
+        sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 ORDER BY number")
+            .bind(player_id)
+            .fetch_all(pool)
+            .await?;
 
     Ok(teams)
 }
 
-pub async fn get_team_by_player(pool: &PgPool, player_id: Uuid) -> Result<Option<TeamDb>, sqlx::Error> {
+pub async fn get_team_by_player(
+    pool: &PgPool,
+    player_id: Uuid,
+) -> Result<Option<TeamDb>, sqlx::Error> {
     let team = sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 LIMIT 1")
         .bind(player_id)
         .fetch_optional(pool)
@@ -198,10 +206,10 @@ pub async fn list_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
 
 pub async fn list_unassigned_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
     let drivers = sqlx::query_as::<_, DriverDb>(
-        "SELECT * FROM driver WHERE team_id IS NULL ORDER BY last_name, first_name"
+        "SELECT * FROM driver WHERE team_id IS NULL ORDER BY last_name, first_name",
     )
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
 
     Ok(drivers)
 }
@@ -302,11 +310,10 @@ pub async fn list_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
 }
 
 pub async fn list_unassigned_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
-    let cars = sqlx::query_as::<_, CarDb>(
-        "SELECT * FROM car WHERE team_id IS NULL ORDER BY number"
-    )
-        .fetch_all(pool)
-        .await?;
+    let cars =
+        sqlx::query_as::<_, CarDb>("SELECT * FROM car WHERE team_id IS NULL ORDER BY number")
+            .fetch_all(pool)
+            .await?;
 
     Ok(cars)
 }

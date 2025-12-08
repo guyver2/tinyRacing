@@ -8,9 +8,9 @@
 // When "randomize" parameter is passed, also generates random unassigned cars and drivers
 
 use chrono::NaiveDate;
-use fake::Fake;
 use fake::faker::name::raw::*;
 use fake::locales::*;
+use fake::Fake;
 use rand::Rng;
 use tiny_racing::database::*;
 
@@ -441,18 +441,34 @@ const TRACKS: &[TrackSeedData] = &[
     },
 ];
 
-const PLAYERS: &[PlayerSeedData] = &[
-    PlayerSeedData {
-        username: "antoine",
-        email: Some("antoine@example.com"),
-        password: "antoine",
-    },
-];
+const PLAYERS: &[PlayerSeedData] = &[PlayerSeedData {
+    username: "antoine",
+    email: Some("antoine@example.com"),
+    password: "antoine",
+}];
 
 const NATIONALITIES: &[&str] = &[
-    "American", "British", "French", "German", "Italian", "Spanish", "Dutch", "Belgian",
-    "Australian", "Canadian", "Brazilian", "Mexican", "Japanese", "Chinese", "Korean",
-    "Swedish", "Finnish", "Norwegian", "Danish", "Swiss", "Austrian",
+    "American",
+    "British",
+    "French",
+    "German",
+    "Italian",
+    "Spanish",
+    "Dutch",
+    "Belgian",
+    "Australian",
+    "Canadian",
+    "Brazilian",
+    "Mexican",
+    "Japanese",
+    "Chinese",
+    "Korean",
+    "Swedish",
+    "Finnish",
+    "Norwegian",
+    "Danish",
+    "Swiss",
+    "Austrian",
 ];
 
 const GENDERS: &[&str] = &["Male", "Female", "Non-binary"];
@@ -489,7 +505,7 @@ fn generate_random_driver(rng: &mut impl Rng) -> GeneratedDriverData {
     // Select random nationality and gender first
     let nationality = NATIONALITIES[rng.random_range(0..NATIONALITIES.len())].to_string();
     let gender = GENDERS[rng.random_range(0..GENDERS.len())].to_string();
-    
+
     // Generate names based on nationality locale
     // Using only locales available in fake crate 4.4.0:
     // AR_SA, CY_GB, DE_DE, EN, FR_FR, IT_IT, JA_JP, PT_BR, PT_PT, ZH_CN, ZH_TW
@@ -530,12 +546,12 @@ fn generate_random_driver(rng: &mut impl Rng) -> GeneratedDriverData {
             LastName(EN).fake::<String>(),
         ),
     };
-    
+
     // Generate a random date of birth between 1985 and 2005
     let year = rng.random_range(1985..=2005);
     let month = rng.random_range(1..=12);
     let day = rng.random_range(1..=28); // Use 28 to avoid month-specific day issues
-    
+
     GeneratedDriverData {
         first_name,
         last_name,
@@ -557,25 +573,24 @@ async fn seed_random_cars_and_drivers(
     num_drivers: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::rng();
-    
+
     // Get the maximum car number to start from
     let existing_cars = list_cars(db.pool()).await?;
-    let max_car_number = existing_cars
-        .iter()
-        .map(|c| c.number)
-        .max()
-        .unwrap_or(0);
+    let max_car_number = existing_cars.iter().map(|c| c.number).max().unwrap_or(0);
     let mut next_car_number = max_car_number + 1;
-    
+
     println!("\n=== Seeding Random Unassigned Cars ===");
     for _ in 0..num_cars {
         // Find the next available car number
-        while get_car_by_number(db.pool(), next_car_number).await?.is_some() {
+        while get_car_by_number(db.pool(), next_car_number)
+            .await?
+            .is_some()
+        {
             next_car_number += 1;
         }
-        
+
         let car_data = generate_random_car(&mut rng, next_car_number);
-        
+
         let car = create_car(
             db.pool(),
             CreateCarRequest {
@@ -591,19 +606,19 @@ async fn seed_random_cars_and_drivers(
             },
         )
         .await?;
-        
+
         println!(
             "Created random unassigned car #{} (ID: {}) - handling: {:.2}, acceleration: {:.2}, top_speed: {:.2}",
             car.number, car.id, car.handling, car.acceleration, car.top_speed
         );
-        
+
         next_car_number += 1;
     }
-    
+
     println!("\n=== Seeding Random Unassigned Drivers ===");
     for _ in 0..num_drivers {
         let driver_data = generate_random_driver(&mut rng);
-        
+
         // Check if driver already exists (unlikely but possible with random generation)
         if get_driver_by_first_and_last_name(
             db.pool(),
@@ -619,7 +634,7 @@ async fn seed_random_cars_and_drivers(
             );
             continue;
         }
-        
+
         let driver = create_driver(
             db.pool(),
             CreateDriverRequest {
@@ -639,7 +654,7 @@ async fn seed_random_cars_and_drivers(
             },
         )
         .await?;
-        
+
         println!(
             "Created random unassigned driver: {} {} ({}, {}) (ID: {}) - skill: {:.2}, stamina: {:.2}",
             driver.first_name,
@@ -651,7 +666,7 @@ async fn seed_random_cars_and_drivers(
             driver.stamina
         );
     }
-    
+
     Ok(())
 }
 
@@ -660,7 +675,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check for randomize parameter
     let args: Vec<String> = std::env::args().collect();
     let randomize = args.iter().any(|arg| arg == "randomize");
-    
+
     // Get database URL from environment or use default
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgresql://tiny_racing:tiny_racing_password@localhost:5432/tiny_racing".to_string()
@@ -864,13 +879,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cars = list_cars(db.pool()).await?;
     let drivers = list_drivers(db.pool()).await?;
     let tracks = list_tracks(db.pool()).await?;
-    
+
     let unassigned_cars = list_unassigned_cars(db.pool()).await?;
     let unassigned_drivers = list_unassigned_drivers(db.pool()).await?;
 
     println!("Total teams in database: {}", teams.len());
-    println!("Total cars in database: {} ({} unassigned)", cars.len(), unassigned_cars.len());
-    println!("Total drivers in database: {} ({} unassigned)", drivers.len(), unassigned_drivers.len());
+    println!(
+        "Total cars in database: {} ({} unassigned)",
+        cars.len(),
+        unassigned_cars.len()
+    );
+    println!(
+        "Total drivers in database: {} ({} unassigned)",
+        drivers.len(),
+        unassigned_drivers.len()
+    );
     println!("Total tracks in database: {}", tracks.len());
 
     println!("\nSeeding completed successfully!");

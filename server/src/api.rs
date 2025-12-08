@@ -1,13 +1,19 @@
 use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
 use crate::commands;
 use crate::database::{
-    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_team_by_player, get_track_by_id,
+    create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest,
 };
-use crate::database::{list_cars, list_drivers, list_players, list_teams, list_teams_by_player, list_tracks, list_unassigned_cars, list_unassigned_drivers};
-use crate::database::{create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest};
+use crate::database::{
+    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_team_by_player,
+    get_track_by_id,
+};
+use crate::database::{
+    list_cars, list_drivers, list_players, list_teams, list_teams_by_player, list_tracks,
+    list_unassigned_cars, list_unassigned_drivers,
+};
 use crate::models::car::CarStatus;
-use crate::models::race::{RaceRunState, RaceState};
 use crate::models::driver_avatar::generate_driver_avatar;
+use crate::models::race::{RaceRunState, RaceState};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -17,12 +23,12 @@ use axum::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
-use std::sync::{Arc, Mutex};
-use std::path::Path as StdPath;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tokio::sync::broadcast;
+use std::path::Path as StdPath;
+use std::sync::{Arc, Mutex};
 use tokio::fs;
+use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
@@ -178,7 +184,12 @@ pub struct DriverResponse {
 }
 
 /// Generates a deterministic filename for a driver avatar based on name, gender, and DoB
-fn get_avatar_filename(first_name: &str, last_name: &str, gender: &str, date_of_birth: &chrono::NaiveDate) -> String {
+fn get_avatar_filename(
+    first_name: &str,
+    last_name: &str,
+    gender: &str,
+    date_of_birth: &chrono::NaiveDate,
+) -> String {
     let mut hasher = DefaultHasher::new();
     let full_name = format!("{} {}", first_name, last_name);
     full_name.hash(&mut hasher);
@@ -191,39 +202,41 @@ fn get_avatar_filename(first_name: &str, last_name: &str, gender: &str, date_of_
 /// Ensures the avatar exists for a driver, generating it if necessary
 /// Returns the URL path to the avatar
 async fn ensure_driver_avatar(driver: &crate::database::DriverDb) -> Result<String, ApiError> {
-    let filename = get_avatar_filename(&driver.first_name, &driver.last_name, &driver.gender, &driver.date_of_birth);
+    let filename = get_avatar_filename(
+        &driver.first_name,
+        &driver.last_name,
+        &driver.gender,
+        &driver.date_of_birth,
+    );
     let avatar_dir = StdPath::new("assets/avatars/drivers");
     let avatar_path = avatar_dir.join(&filename);
-    
+
     // If avatar already exists, just return the URL
     if fs::metadata(&avatar_path).await.is_ok() {
         return Ok(format!("/assets/avatars/drivers/{}", filename));
     }
-    
+
     // Generate the avatar
     let full_name = format!("{} {}", driver.first_name, driver.last_name);
     let svg_content = generate_driver_avatar(&full_name, &driver.gender, &driver.date_of_birth);
-    
+
     // Ensure directory exists
-    fs::create_dir_all(avatar_dir)
-        .await
-        .map_err(|e| ApiError::InternalError(format!("Failed to create avatar directory: {}", e)))?;
-    
+    fs::create_dir_all(avatar_dir).await.map_err(|e| {
+        ApiError::InternalError(format!("Failed to create avatar directory: {}", e))
+    })?;
+
     // Write the SVG file
     fs::write(&avatar_path, svg_content)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to write avatar file: {}", e)))?;
-    
+
     Ok(format!("/assets/avatars/drivers/{}", filename))
 }
 
 /// Converts a DriverDb to DriverResponse with avatar URL
 async fn driver_to_response(driver: crate::database::DriverDb) -> Result<DriverResponse, ApiError> {
     let avatar_url = ensure_driver_avatar(&driver).await?;
-    Ok(DriverResponse {
-        driver,
-        avatar_url,
-    })
+    Ok(DriverResponse { driver, avatar_url })
 }
 
 // Create the API Router
@@ -319,10 +332,11 @@ async fn get_teams(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    
+
     let teams = if let Some(player_id_str) = params.player_id {
-        let player_id = Uuid::parse_str(&player_id_str)
-            .map_err(|_| ApiError::BadRequest(format!("Invalid player ID format: {}", player_id_str)))?;
+        let player_id = Uuid::parse_str(&player_id_str).map_err(|_| {
+            ApiError::BadRequest(format!("Invalid player ID format: {}", player_id_str))
+        })?;
         list_teams_by_player(pool, player_id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
@@ -384,7 +398,8 @@ async fn get_my_team(
         None
     };
 
-    let player_id = player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+    let player_id =
+        player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     let team = get_team_by_player(pool, player_id)
         .await
@@ -433,14 +448,16 @@ async fn create_team_handler(
 
     // Check if player already has a team
     if let Some(pid) = final_player_id {
-        let existing_team = get_team_by_player(pool, pid)
-            .await
-            .map_err(|e| ApiError::InternalError(format!("Failed to check existing team: {}", e)))?;
+        let existing_team = get_team_by_player(pool, pid).await.map_err(|e| {
+            ApiError::InternalError(format!("Failed to check existing team: {}", e))
+        })?;
 
         if existing_team.is_some() {
-            return Err(ApiError::BadRequest("You already have a team. Each player can only manage one team.".to_string()));
+            return Err(ApiError::BadRequest(
+                "You already have a team. Each player can only manage one team.".to_string(),
+            ));
         }
-        
+
         team_request.player_id = Some(pid);
     }
 
@@ -451,7 +468,10 @@ async fn create_team_handler(
             .map_err(|e| ApiError::InternalError(format!("Failed to check team number: {}", e)))?;
 
         if existing_team.is_some() {
-            return Err(ApiError::BadRequest(format!("Team number {} already exists", number)));
+            return Err(ApiError::BadRequest(format!(
+                "Team number {} already exists",
+                number
+            )));
         }
     }
 
@@ -459,7 +479,10 @@ async fn create_team_handler(
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to create team: {}", e)))?;
 
-    Ok(success(Some(team), Some("Team created successfully".to_string())))
+    Ok(success(
+        Some(team),
+        Some("Team created successfully".to_string()),
+    ))
 }
 
 // Get all drivers
@@ -492,9 +515,9 @@ async fn get_unassigned_drivers(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let drivers = list_unassigned_drivers(pool)
-        .await
-        .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e)))?;
+    let drivers = list_unassigned_drivers(pool).await.map_err(|e| {
+        ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e))
+    })?;
 
     // Convert each driver to DriverResponse with avatar
     let mut drivers_with_avatars = Vec::new();

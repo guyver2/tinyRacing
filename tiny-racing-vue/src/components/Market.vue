@@ -583,8 +583,8 @@ h2 {
 }
 
 .driver-avatar {
-  width: 48px;
-  height: 48px;
+  /* width: 96px;
+  height: 96px; */
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #e0e0e0;
