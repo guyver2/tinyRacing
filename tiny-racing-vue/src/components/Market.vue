@@ -12,6 +12,16 @@
 
       <!-- Market content -->
       <div v-if="!loading && !error" class="market-sections">
+        <!-- Team Info -->
+        <div v-if="myTeam" class="team-info">
+          <h3>Your Team</h3>
+          <div class="team-stats">
+            <div class="stat-item">
+              <span class="stat-label">Cash:</span>
+              <span class="stat-value">${{ myTeam.cash }}</span>
+            </div>
+          </div>
+        </div>
         <!-- Drivers Section -->
         <section class="market-section">
           <h3>Available Drivers</h3>
@@ -76,7 +86,22 @@
                   <span class="detail-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
                 </div>
               </div>
-              <button v-if="expandedDrivers.has(driver.id)" class="buy-button" disabled>Buy (Coming Soon)</button>
+              <div v-if="expandedDrivers.has(driver.id)" class="buy-section">
+                <div class="price-info">
+                  <span class="price-label">Price:</span>
+                  <span class="price-value">${{ getDriverPrice(driver) }}</span>
+                </div>
+                <button 
+                  class="buy-button" 
+                  :disabled="!canBuyDriver(driver) || buyingDriverId === driver.id"
+                  @click="handleBuyDriver(driver)"
+                >
+                  <span v-if="buyingDriverId === driver.id">Processing...</span>
+                  <span v-else-if="!myTeam">No Team</span>
+                  <span v-else-if="!canBuyDriver(driver)">Insufficient Cash</span>
+                  <span v-else>Buy Driver</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -134,7 +159,22 @@
                   <span class="detail-value">{{ car.base_performance.toFixed(1) }}</span>
                 </div>
               </div>
-              <button v-if="expandedCars.has(car.id)" class="buy-button" disabled>Buy (Coming Soon)</button>
+              <div v-if="expandedCars.has(car.id)" class="buy-section">
+                <div class="price-info">
+                  <span class="price-label">Price:</span>
+                  <span class="price-value">${{ getCarPrice(car) }}</span>
+                </div>
+                <button 
+                  class="buy-button" 
+                  :disabled="!canBuyCar(car) || buyingCarId === car.id"
+                  @click="handleBuyCar(car)"
+                >
+                  <span v-if="buyingCarId === car.id">Processing...</span>
+                  <span v-else-if="!myTeam">No Team</span>
+                  <span v-else-if="!canBuyCar(car)">Insufficient Cash</span>
+                  <span v-else>Buy Car</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -145,7 +185,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { getUnassignedDrivers, getUnassignedCars, type DriverDb, type CarDb } from '@/services/ApiService';
+import { getUnassignedDrivers, getUnassignedCars, buyDriver, buyCar, getMyTeam, type DriverDb, type CarDb, type TeamDb } from '@/services/ApiService';
 
 const drivers = ref<DriverDb[]>([]);
 const cars = ref<CarDb[]>([]);
@@ -153,6 +193,9 @@ const loading = ref(true);
 const error = ref('');
 const expandedDrivers = ref<Set<string>>(new Set());
 const expandedCars = ref<Set<string>>(new Set());
+const myTeam = ref<TeamDb | null>(null);
+const buyingDriverId = ref<string | null>(null);
+const buyingCarId = ref<string | null>(null);
 
 function toggleDriver(driverId: string) {
   if (expandedDrivers.value.has(driverId)) {
@@ -370,6 +413,36 @@ function getDriverAverageStat(driver: DriverDb): number {
   ) / 6;
 }
 
+function getDriverPrice(driver: DriverDb): number {
+  const avgStat = getDriverAverageStat(driver);
+  return Math.round(avgStat * 100);
+}
+
+function canBuyDriver(driver: DriverDb): boolean {
+  if (!myTeam.value) return false;
+  const price = getDriverPrice(driver);
+  return myTeam.value.cash >= price;
+}
+
+async function handleBuyDriver(driver: DriverDb) {
+  if (buyingDriverId.value === driver.id) return; // Already processing
+  
+  buyingDriverId.value = driver.id;
+  error.value = '';
+  
+  try {
+    const updatedTeam = await buyDriver(driver.id);
+    myTeam.value = updatedTeam;
+    // Reload market to remove purchased driver
+    await loadMarket();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to buy driver';
+    console.error('Error buying driver:', err);
+  } finally {
+    buyingDriverId.value = null;
+  }
+}
+
 function getCarAverageStat(car: CarDb): number {
   return (
     car.handling +
@@ -382,18 +455,50 @@ function getCarAverageStat(car: CarDb): number {
   ) / 7;
 }
 
+function getCarPrice(car: CarDb): number {
+  const avgStat = getCarAverageStat(car);
+  return Math.round(avgStat * 100);
+}
+
+function canBuyCar(car: CarDb): boolean {
+  if (!myTeam.value) return false;
+  const price = getCarPrice(car);
+  return myTeam.value.cash >= price;
+}
+
+async function handleBuyCar(car: CarDb) {
+  if (buyingCarId.value === car.id) return; // Already processing
+  
+  buyingCarId.value = car.id;
+  error.value = '';
+  
+  try {
+    const updatedTeam = await buyCar(car.id);
+    myTeam.value = updatedTeam;
+    // Reload market to remove purchased car
+    await loadMarket();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to buy car';
+    console.error('Error buying car:', err);
+  } finally {
+    buyingCarId.value = null;
+  }
+}
+
 async function loadMarket() {
   loading.value = true;
   error.value = '';
   
   try {
-    const [driversData, carsData] = await Promise.all([
+    const [driversData, carsData, teamData] = await Promise.all([
       getUnassignedDrivers(),
       getUnassignedCars(),
+      getMyTeam().catch(() => null), // Don't fail if team doesn't exist
     ]);
     
     drivers.value = driversData;
     cars.value = carsData;
+    myTeam.value = teamData;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load market';
     console.error('Error loading market:', err);
@@ -642,6 +747,67 @@ h2 {
   font-size: 0.95rem;
 }
 
+.team-info {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+
+.team-info h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: #2d4059;
+  font-size: 1.2rem;
+}
+
+.team-stats {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  color: #1a1a2e;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.buy-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.price-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.price-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.price-value {
+  color: #2d4059;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
 .buy-button {
   width: 100%;
   padding: 0.75rem;
@@ -652,7 +818,6 @@ h2 {
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  margin-top: 0.5rem;
   transition: background-color 0.2s;
 }
 

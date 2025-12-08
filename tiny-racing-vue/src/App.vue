@@ -6,6 +6,7 @@ import LoginForm from './components/LoginForm.vue';
 import RegisterForm from './components/RegisterForm.vue';
 import Team from './components/Team.vue';
 import Market from './components/Market.vue';
+import Races from './components/Races.vue';
 import { isAuthenticated, logout } from './services/ApiService';
 
 const authenticated = ref(false);
@@ -76,12 +77,9 @@ onMounted(() => {
         <Market />
       </div>
 
-      <!-- Races view (placeholder) -->
-      <div v-show="currentView === 'races'" class="view">
-        <div class="placeholder-view">
-          <h2>Races</h2>
-          <p>Race list and details will be displayed here.</p>
-        </div>
+      <!-- Races view -->
+      <div v-show="currentView === 'races'" class="view races-view">
+        <Races />
       </div>
 
       <!-- Login view -->
@@ -127,7 +125,8 @@ onMounted(() => {
   height: 100%;
 }
 
-.view.market-view {
+.view.market-view,
+.view.races-view {
   overflow-y: auto;
   height: auto;
   min-height: 100%;

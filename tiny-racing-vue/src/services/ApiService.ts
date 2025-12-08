@@ -330,3 +330,194 @@ export async function getUnassignedCars(): Promise<CarDb[]> {
   
   throw new Error(data.message || 'Failed to fetch unassigned cars');
 }
+
+// Buy a driver
+export async function buyDriver(driverId: string): Promise<TeamDb> {
+  const response = await apiRequest(`/drivers/${driverId}/buy`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to buy driver: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TeamDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to buy driver');
+}
+
+// Buy a car
+export async function buyCar(carId: string): Promise<TeamDb> {
+  const response = await apiRequest(`/cars/${carId}/buy`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to buy car: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TeamDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to buy car');
+}
+
+// Get drivers for a team
+export async function getTeamDrivers(teamId: string): Promise<DriverDb[]> {
+  const response = await apiRequest(`/teams/${teamId}/drivers`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch team drivers: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<DriverDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch team drivers');
+}
+
+// Get cars for a team
+export async function getTeamCars(teamId: string): Promise<CarDb[]> {
+  const response = await apiRequest(`/teams/${teamId}/cars`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch team cars: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<CarDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch team cars');
+}
+
+// Assign/unassign driver to car
+export async function assignDriverToCar(driverId: string, carId: string | null): Promise<DriverDb> {
+  const response = await apiRequest(`/drivers/${driverId}/assign-car`, {
+    method: 'POST',
+    body: JSON.stringify({ car_id: carId }),
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to assign driver to car: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<DriverDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to assign driver to car');
+}
+
+// Track interfaces
+export interface TrackDb {
+  id: string;
+  track_id: string;
+  name: string;
+  description: string | null;
+  laps: number;
+  lap_length_km: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Get all tracks
+export async function getTracks(): Promise<TrackDb[]> {
+  const response = await apiRequest('/tracks');
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch tracks: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<TrackDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch tracks');
+}
+
+// Race interfaces
+export interface RaceDb {
+  id: string;
+  track_id: string;
+  laps: number;
+  status: string;
+  start_datetime: string | null;
+  creator_id: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateRaceRequest {
+  track_id: string;
+  laps: number;
+  status?: string;
+  start_datetime?: string | null;
+  description?: string | null;
+}
+
+// Get all races
+export async function getRaces(): Promise<RaceDb[]> {
+  const response = await apiRequest('/races');
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch races: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RaceDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch races');
+}
+
+// Get a single race by ID
+export async function getRace(raceId: string): Promise<RaceDb> {
+  const response = await apiRequest(`/races/${raceId}`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch race: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RaceDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+  
+  throw new Error(data.message || 'Failed to fetch race');
+}
+
+// Create a new race
+export async function createRace(request: CreateRaceRequest): Promise<RaceDb> {
+  const response = await apiRequest('/races', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to create race: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<RaceDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to create race');
+}

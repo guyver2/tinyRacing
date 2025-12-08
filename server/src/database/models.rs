@@ -169,3 +169,26 @@ pub struct LoginResponse {
     pub token: String,
     pub expires_at: DateTime<Utc>,
 }
+
+// Database representation of a Race
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct RaceDb {
+    pub id: Uuid,
+    pub track_id: Uuid,
+    pub laps: i32,
+    pub status: String, // race_status enum as string
+    pub start_datetime: Option<DateTime<Utc>>,
+    pub creator_id: Option<Uuid>,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRaceRequest {
+    pub track_id: Uuid,
+    pub laps: i32,
+    pub status: Option<String>, // Optional, defaults to REGISTRATION_OPEN
+    pub start_datetime: Option<DateTime<Utc>>,
+    pub description: Option<String>,
+}

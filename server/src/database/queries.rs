@@ -138,6 +138,32 @@ pub async fn delete_team(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
+pub async fn count_drivers_by_team(pool: &PgPool, team_id: Uuid) -> Result<i64, sqlx::Error> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM driver WHERE team_id = $1")
+        .bind(team_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(count)
+}
+
+pub async fn update_team_cash(pool: &PgPool, team_id: Uuid, new_cash: i32) -> Result<TeamDb, sqlx::Error> {
+    let team = sqlx::query_as::<_, TeamDb>(
+        r#"
+        UPDATE team
+        SET cash = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(team_id)
+    .bind(new_cash)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(team)
+}
+
 // ========== Driver Queries ==========
 
 pub async fn create_driver(
@@ -214,6 +240,17 @@ pub async fn list_unassigned_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sql
     Ok(drivers)
 }
 
+pub async fn list_drivers_by_team(pool: &PgPool, team_id: Uuid) -> Result<Vec<DriverDb>, sqlx::Error> {
+    let drivers = sqlx::query_as::<_, DriverDb>(
+        "SELECT * FROM driver WHERE team_id = $1 ORDER BY last_name, first_name",
+    )
+    .bind(team_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(drivers)
+}
+
 pub async fn update_driver(
     pool: &PgPool,
     id: Uuid,
@@ -255,6 +292,40 @@ pub async fn delete_driver(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error>
         .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn assign_driver_to_team(pool: &PgPool, driver_id: Uuid, team_id: Uuid) -> Result<DriverDb, sqlx::Error> {
+    let driver = sqlx::query_as::<_, DriverDb>(
+        r#"
+        UPDATE driver
+        SET team_id = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(driver_id)
+    .bind(team_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(driver)
+}
+
+pub async fn assign_driver_to_car(pool: &PgPool, driver_id: Uuid, car_id: Option<Uuid>) -> Result<DriverDb, sqlx::Error> {
+    let driver = sqlx::query_as::<_, DriverDb>(
+        r#"
+        UPDATE driver
+        SET car_id = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(driver_id)
+    .bind(car_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(driver)
 }
 
 // ========== Car Queries ==========
@@ -365,6 +436,32 @@ pub async fn delete_car(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn assign_car_to_team(pool: &PgPool, car_id: Uuid, team_id: Uuid) -> Result<CarDb, sqlx::Error> {
+    let car = sqlx::query_as::<_, CarDb>(
+        r#"
+        UPDATE car
+        SET team_id = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(car_id)
+    .bind(team_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(car)
+}
+
+pub async fn count_cars_by_team(pool: &PgPool, team_id: Uuid) -> Result<i64, sqlx::Error> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM car WHERE team_id = $1")
+        .bind(team_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(count)
 }
 
 // ========== Track Queries ==========
@@ -537,4 +634,67 @@ pub async fn delete_player(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error>
         .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+// ========== Race Queries ==========
+
+pub async fn create_race(
+    pool: &PgPool,
+    request: CreateRaceRequest,
+    creator_id: Uuid,
+) -> Result<RaceDb, sqlx::Error> {
+    let status = request.status.unwrap_or_else(|| "REGISTRATION_OPEN".to_string());
+    
+    let race = sqlx::query_as::<_, RaceDb>(
+        r#"
+        INSERT INTO race (track_id, laps, status, start_datetime, creator_id, description)
+        VALUES ($1, $2, $3::race_status, $4, $5, $6)
+        RETURNING id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        "#,
+    )
+    .bind(request.track_id)
+    .bind(request.laps)
+    .bind(status)
+    .bind(request.start_datetime)
+    .bind(creator_id)
+    .bind(request.description)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(race)
+}
+
+pub async fn get_race_by_id(pool: &PgPool, id: Uuid) -> Result<Option<RaceDb>, sqlx::Error> {
+    let race = sqlx::query_as::<_, RaceDb>(
+        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race WHERE id = $1"
+    )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(race)
+}
+
+pub async fn list_races(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+    let races = sqlx::query_as::<_, RaceDb>(
+        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY created_at DESC"
+    )
+        .fetch_all(pool)
+        .await?;
+
+    Ok(races)
+}
+
+pub async fn list_races_by_creator(
+    pool: &PgPool,
+    creator_id: Uuid,
+) -> Result<Vec<RaceDb>, sqlx::Error> {
+    let races = sqlx::query_as::<_, RaceDb>(
+        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race WHERE creator_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(creator_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(races)
 }
