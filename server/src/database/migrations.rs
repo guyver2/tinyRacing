@@ -31,7 +31,7 @@ impl Migration {
             .and_then(|n| n.to_str())
             .ok_or_else(|| MigrationError::InvalidFormat("Invalid file name".to_string()))?;
 
-        // Extract version and name from filename like "20251117_initial_schema.sql"
+        // Extract version and name from filename like "20251117000000_initial_schema.sql"
         let (version, name) = parse_migration_filename(file_name)?;
 
         Ok(Migration {
@@ -49,7 +49,7 @@ impl Migration {
             .and_then(|n| n.to_str())
             .ok_or_else(|| MigrationError::InvalidFormat("Invalid file name".to_string()))?;
 
-        // Extract version and name from filename like "20251130_add_password_hash_to_player.up.sql"
+        // Extract version and name from filename like "20251130000000_add_password_hash_to_player.up.sql"
         let base_name = file_name
             .strip_suffix(".up.sql")
             .ok_or_else(|| MigrationError::InvalidFormat("Not a .up.sql file".to_string()))?;
@@ -97,8 +97,8 @@ impl Migration {
 
 /// Parse migration filename to extract version and name
 /// Supports formats like:
-/// - "20251117_initial_schema.sql"
-/// - "20251130_add_password_hash_to_player"
+/// - "20251117000000_initial_schema.sql" (YYYYMMDDHHMMSS format)
+/// - "20251130000000_add_password_hash_to_player"
 fn parse_migration_filename(filename: &str) -> Result<(i64, String), MigrationError> {
     // Remove .sql extension if present
     let base = filename.strip_suffix(".sql").unwrap_or(filename);
@@ -108,6 +108,23 @@ fn parse_migration_filename(filename: &str) -> Result<(i64, String), MigrationEr
         let version_str = &base[..underscore_pos];
         let name = base[underscore_pos + 1..].to_string();
 
+        // Validate that version is exactly 14 digits (YYYYMMDDHHMMSS)
+        if version_str.len() != 14 {
+            return Err(MigrationError::InvalidFormat(format!(
+                "Migration version must be exactly 14 digits (YYYYMMDDHHMMSS), got: {} ({} digits)",
+                version_str,
+                version_str.len()
+            )));
+        }
+
+        // Validate that all characters are digits
+        if !version_str.chars().all(|c| c.is_ascii_digit()) {
+            return Err(MigrationError::InvalidFormat(format!(
+                "Migration version must contain only digits, got: {}",
+                version_str
+            )));
+        }
+
         let version = version_str.parse::<i64>().map_err(|_| {
             MigrationError::InvalidFormat(format!("Invalid version: {}", version_str))
         })?;
@@ -115,6 +132,18 @@ fn parse_migration_filename(filename: &str) -> Result<(i64, String), MigrationEr
         Ok((version, name))
     } else {
         // Try to parse entire filename as version
+        if base.len() != 14 {
+            return Err(MigrationError::InvalidFormat(format!(
+                "Migration filename must be in format YYYYMMDDHHMMSS_description, got: {}",
+                filename
+            )));
+        }
+        if !base.chars().all(|c| c.is_ascii_digit()) {
+            return Err(MigrationError::InvalidFormat(format!(
+                "Migration version must contain only digits, got: {}",
+                base
+            )));
+        }
         let version = base.parse::<i64>().map_err(|_| {
             MigrationError::InvalidFormat(format!("Invalid migration filename: {}", filename))
         })?;
