@@ -1,4 +1,13 @@
-const API_URL = 'http://localhost:3000';
+const getApiUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  // If it's a relative URL, use it directly (nginx will proxy it)
+  if (apiUrl.startsWith('/')) {
+    return apiUrl;
+  }
+  return apiUrl;
+};
+
+const API_URL = getApiUrl();
 
 // Token storage key
 const TOKEN_KEY = 'jwt_token';

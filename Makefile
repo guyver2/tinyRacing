@@ -11,6 +11,9 @@ help:
 	@echo "Available make targets:"
 	@echo "  db-up         Start the PostgreSQL Docker container"
 	@echo "  db-down       Stop and remove PostgreSQL Docker container"
+	@echo "  docker-up     Start the Docker containers"
+	@echo "  docker-down   Stop and remove the Docker containers"
+	@echo "  docker-build  Build the Docker images"
 	@echo "  db-shell      psql shell into the running database"
 	@echo "  db-seed       Seed the database using the seed script"
 	@echo "  db-seed-randomize Seed the database using the seed script with randomization"
@@ -23,13 +26,22 @@ help:
 
 db-up:
 	@if [ "$$(docker ps -q -f name=tiny_racing_db)" = "" ]; then \
-		docker compose up -d; \
+		docker compose up -d postgres; \
 	else \
 		echo "PostgreSQL container already running."; \
 	fi
 
 db-down:
 	docker compose down
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-build:
+	docker compose build
 
 db-migrate:
 	cd $(CARGO_DIR) && cargo run --example run_migrations

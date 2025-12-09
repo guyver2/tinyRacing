@@ -22,7 +22,7 @@ mod ncurses_ui;
 use crate::ncurses_ui::*;
 
 mod database;
-use crate::database::init_from_env;
+use crate::database::{init_from_env, Database};
 mod api;
 mod auth;
 mod auth_middleware;
@@ -171,8 +171,27 @@ async fn main() {
             // Clone the race state for the API server
             let api_race_state = shared_state.clone();
 
-            // Initialize database connection
-            let db_pool = init_from_env().await;
+            // Initialize database connection and run migrations
+            let db_pool = if let Some(database_url) = std::env::var("DATABASE_URL").ok() {
+                tracing::info!("Connecting to database and running migrations...");
+                match Database::new(&database_url).await {
+                    Ok(db) => {
+                        // Run migrations
+                        if let Err(e) = db.migrate().await {
+                            tracing::warn!("Failed to run migrations: {}. Continuing anyway...", e);
+                        } else {
+                            tracing::info!("Database migrations completed successfully");
+                        }
+                        Some(db.pool().clone())
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to connect to database: {}. API database endpoints will not work.", e);
+                        None
+                    }
+                }
+            } else {
+                init_from_env().await
+            };
 
             // Start the API server in a separate task
             tokio::spawn(async move {
@@ -184,21 +203,43 @@ async fn main() {
                 axum::serve(listener, app).await.unwrap();
             });
 
-            // --- Spawn UI Thread ---
-            let ui_log_tx = log_tx.clone(); // Clone for initial messages
-            let initial_track_name_for_ui = track_name.clone();
-            let shared_state_for_ui = Arc::clone(&shared_state);
-            thread::spawn(move || {
-                ui_thread_main(
-                    view_rx,
-                    cmd_tx,
-                    log_rx,
-                    initial_track_name_for_ui,
-                    shared_state_for_ui,
-                );
-            });
-
-            ui_log_tx.send("UI thread started.".to_string()).ok();
+            // --- Spawn UI Thread (only if not disabled) ---
+            // In Docker/headless mode, disable UI to avoid terminal errors
+            let disable_ui = std::env::var("DISABLE_UI").unwrap_or_else(|_| "true".to_string()) == "true";
+            
+            if !disable_ui {
+                let ui_log_tx = log_tx.clone(); // Clone for initial messages
+                let initial_track_name_for_ui = track_name.clone();
+                let shared_state_for_ui = Arc::clone(&shared_state);
+                thread::spawn(move || {
+                    ui_thread_main(
+                        view_rx,
+                        cmd_tx,
+                        log_rx,
+                        initial_track_name_for_ui,
+                        shared_state_for_ui,
+                    );
+                });
+                ui_log_tx.send("UI thread started.".to_string()).ok();
+            } else {
+                // In headless mode, consume messages from channels to prevent blocking
+                // Consume view updates
+                thread::spawn(move || {
+                    while let Ok(_) = view_rx.recv() {
+                        // Consume view updates in headless mode
+                    }
+                });
+                // Consume log messages
+                thread::spawn(move || {
+                    while let Ok(_) = log_rx.recv() {
+                        // Consume log messages in headless mode
+                    }
+                });
+                // Commands are not processed in headless mode (cmd_tx will just drop messages)
+                log_tx.send("Running in headless mode (UI disabled).".to_string()).ok();
+            }
+            
+            let ui_log_tx = log_tx.clone();
             ui_log_tx
                 .send(format!("Track loaded: {}:{}", track_id, track_name))
                 .ok();
@@ -248,28 +289,30 @@ async fn main() {
             });
             ui_log_tx.send("Game loop started.".to_string()).ok();
 
-            // --- Spawn Command Processor Task ---
-            let cmd_proc_state = Arc::clone(&shared_state);
-            let cmd_proc_log_tx = log_tx.clone();
-            tokio::task::spawn_blocking(move || {
-                // Use spawn_blocking for std_mpsc::Receiver
-                while let Ok(command_str) = cmd_rx_ui.recv() {
-                    // Blocks here until command
-                    let result_str = handle_command(command_str, Arc::clone(&cmd_proc_state));
-                    if cmd_proc_log_tx
-                        .send(format!("CMD_RESULT:{}", result_str))
-                        .is_err()
-                    {
-                        // UI log channel closed
-                        break;
+            // --- Spawn Command Processor Task (only if UI enabled) ---
+            if !disable_ui {
+                let cmd_proc_state = Arc::clone(&shared_state);
+                let cmd_proc_log_tx = log_tx.clone();
+                tokio::task::spawn_blocking(move || {
+                    // Use spawn_blocking for std_mpsc::Receiver
+                    while let Ok(command_str) = cmd_rx_ui.recv() {
+                        // Blocks here until command
+                        let result_str = handle_command(command_str, Arc::clone(&cmd_proc_state));
+                        if cmd_proc_log_tx
+                            .send(format!("CMD_RESULT:{}", result_str))
+                            .is_err()
+                        {
+                            // UI log channel closed
+                            break;
+                        }
                     }
-                }
-                // Log that command processor is shutting down if necessary
-                let _ = cmd_proc_log_tx.send("Command processor shutting down.".to_string());
-            });
-            ui_log_tx
-                .send("Command processor started.".to_string())
-                .ok();
+                    // Log that command processor is shutting down if necessary
+                    let _ = cmd_proc_log_tx.send("Command processor shutting down.".to_string());
+                });
+                ui_log_tx
+                    .send("Command processor started.".to_string())
+                    .ok();
+            }
 
             // --- Setup WebSocket Server (Optional - can run in parallel) ---
             let state_filter = warp::any().map(move || Arc::clone(&shared_state));
@@ -295,7 +338,7 @@ async fn main() {
                 );
 
             let routes = websocket_route;
-            let addr = ([127, 0, 0, 1], 3030);
+            let addr = ([0, 0, 0, 0], 3030);
             let server_log_tx = log_tx.clone();
 
             tokio::spawn(async move {

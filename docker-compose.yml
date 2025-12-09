@@ -19,5 +19,58 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - tiny_racing_network
 
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: tiny_racing_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      DISABLE_UI: "true"
+    ports:
+      - "${BACKEND_API_PORT:-3000}:3000"
+      - "${BACKEND_WS_PORT:-3030}:3030"
+    volumes:
+      - ./assets:/app/assets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tiny_racing_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: tiny-racing-vue/Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: /ws
+    container_name: tiny_racing_frontend
+    restart: unless-stopped
+    networks:
+      - tiny_racing_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: tiny_racing_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - tiny_racing_network
+
+networks:
+  tiny_racing_network:
+    driver: bridge
 

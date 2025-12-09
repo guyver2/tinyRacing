@@ -25,8 +25,18 @@ const startTime = ref(Date.now());
 // WebSocket connection
 let socket: WebSocket;
 
+const getWebSocketUrl = () => {
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:3030';
+  // If it's a relative URL, construct the WebSocket URL from current location
+  if (wsUrl.startsWith('/')) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}${wsUrl}/ws`;
+  }
+  return `${wsUrl}/ws`;
+};
+
 const connectWebSocket = () => {
-  socket = new WebSocket('ws://127.0.0.1:3030/ws');
+  socket = new WebSocket(getWebSocketUrl());
 
   socket.addEventListener('open', () => {
     connectedState.value = true;

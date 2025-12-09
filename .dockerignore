@@ -1,0 +1,14 @@
+.git/
+.gitignore
+node_modules/
+dist/
+target/
+data/
+*.md
+.env
+.env.local
+.vscode/
+.idea/
+# Don't ignore assets directory - it's needed for frontend build
+!assets/
+

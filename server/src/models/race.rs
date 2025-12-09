@@ -203,7 +203,13 @@ impl RaceState {
         let mut rng = rand::rng();
 
         let config = read_race_config(config_path).unwrap();
-        let track_folder = format!("../assets/tracks/{}", config.track.name);
+        // Derive assets directory from config path
+        // If config_path is /app/assets/race.json, assets_dir will be /app/assets
+        let assets_dir = std::path::Path::new(config_path)
+            .parent()
+            .and_then(|p| p.to_str())
+            .unwrap_or("/app/assets");
+        let track_folder = format!("{}/tracks/{}", assets_dir, config.track.name);
         let mut track = Track::load_track_config(&track_folder).unwrap();
         track.laps = config.track.laps;
 
