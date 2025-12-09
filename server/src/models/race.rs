@@ -12,6 +12,12 @@ use crate::models::track::Track;
 use crate::models::track::TrackClientData;
 
 pub const MAX_PARTICIPANTS: i64 = 5;
+const AUTO_RACE_RESTART: bool = true;
+
+/// Check if auto race restart is enabled via environment variable
+pub fn is_auto_race_restart_enabled() -> bool {
+    AUTO_RACE_RESTART
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum RaceRunState {

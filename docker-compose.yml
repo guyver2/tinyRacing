@@ -37,7 +37,7 @@ services:
       - "${BACKEND_API_PORT:-3000}:3000"
       - "${BACKEND_WS_PORT:-3030}:3030"
     volumes:
-      - ./assets:/app/assets:ro
+      - ./assets:/app/assets
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +53,8 @@ services:
         VITE_WS_URL: /ws
     container_name: tiny_racing_frontend
     restart: unless-stopped
+    volumes:
+      - ./assets/avatars:/usr/share/nginx/html/assets/avatars
     networks:
       - tiny_racing_network
 

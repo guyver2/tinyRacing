@@ -254,21 +254,47 @@ async fn main() {
             let clients_clone_loop = Arc::clone(&clients); // Keep for WebSocket if still used
             let game_view_tx = view_tx.clone();
             let game_log_tx = log_tx.clone();
+            let config_path = args[1].clone(); // Store config path for potential restart
             tokio::spawn(async move {
                 let mut interval = time::interval(Duration::from_millis(100));
                 loop {
                     interval.tick().await;
                     let client_view_opt: Option<RaceStateClientView>;
-                    {
+                    let should_restart = {
                         let mut state_guard = game_state_clone_loop.lock().unwrap();
                         let previous_run_state = state_guard.run_state.clone();
                         state_guard.update();
                         client_view_opt = Some(state_guard.get_client_view());
 
-                        if state_guard.run_state == RaceRunState::Finished
+                        let should_restart = if state_guard.run_state == RaceRunState::Finished
                             && previous_run_state != RaceRunState::Finished
                         {
                             game_log_tx.send("Race Finished!".to_string()).ok();
+                            // Check if auto restart is enabled
+                            crate::models::race::is_auto_race_restart_enabled()
+                        } else {
+                            false
+                        };
+                        should_restart
+                    };
+
+                    // Restart race if needed
+                    if should_restart {
+                        match RaceState::load_race_config(&config_path) {
+                            Ok(new_state) => {
+                                *game_state_clone_loop.lock().unwrap() = new_state;
+                                game_log_tx
+                                    .send("Race automatically restarted!".to_string())
+                                    .ok();
+                            }
+                            Err(e) => {
+                                game_log_tx
+                                    .send(format!(
+                                        "Failed to restart race: {}. Race will remain finished.",
+                                        e
+                                    ))
+                                    .ok();
+                            }
                         }
                     }
 
