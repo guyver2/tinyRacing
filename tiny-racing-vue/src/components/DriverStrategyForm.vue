@@ -157,7 +157,6 @@ function close() {
 <style scoped>
 * {
   box-sizing: border-box;
-  font-family: 'Courier New', monospace;
 }
 
 .strategy-form-overlay {

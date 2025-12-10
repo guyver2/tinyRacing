@@ -50,7 +50,6 @@ const isCarTableCollapsed = ref(true);
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Courier New', monospace;
 }
 
 .app-container {

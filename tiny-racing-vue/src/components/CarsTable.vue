@@ -26,7 +26,7 @@
           :key="car.car_number"
           :class="getRowClasses(car)"
           @click="selectCar(car)"
-          :style="{ 'background-color': car.team.color }"
+          :style="{ 'background-color': hexToPastel(car.team.color) }"
           :title="isPlayerCar(car) ? 'Click to manage strategy' : 'This is not your car'"
         >
           <td v-if="!collapsed" :class="{ 'top-3': car.race_position <= 3 }">
@@ -73,6 +73,7 @@ import { ref, computed } from 'vue';
 import type { Car } from '@/types';
 import DriverStrategyForm from './DriverStrategyForm.vue';
 import { getPlayerId } from '@/services/ApiService';
+import { hexToPastel } from '@/utils/colorUtils';
 
 const props = defineProps<{
   cars: Car[];
@@ -127,13 +128,14 @@ function closeStrategyForm() {
 </script>
 
 <style scoped>
+
 .cars-table-wrapper {
   position: relative;
   width: 100%;
 }
 
 .team {
-  color: #2d4059;
+  color: #141c27;
   cursor: pointer;
 }
 
@@ -181,6 +183,8 @@ function closeStrategyForm() {
   padding: 10px;
   text-align: left;
   border-bottom: 1px solid #c9d6df;
+  color: #141c27;
+  font-weight: bold;
 }
 
 .cars-table td {
@@ -189,6 +193,7 @@ function closeStrategyForm() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #141c27;
 }
 
 .cars-table.collapsed th,

@@ -64,6 +64,7 @@ async function startStopRace() {
 </script>
 
 <style scoped>
+
 header {
   display: flex;
   justify-content: space-between;
@@ -75,13 +76,19 @@ header {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   width: 100%;
   flex-shrink: 0;
+  color: #141c27;
 }
 .race-info {
   font-size: 1.1em;
+  color: #141c27;
 }
 .race-status {
   text-align: right;
   font-size: 1.1em;
+  color: #141c27;
+}
+.wetness-indicator {
+  color: #141c27;
 }
 
 .weather-container {

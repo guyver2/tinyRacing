@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import type { Car } from '@/types/index';
+import { hexToPastel } from '@/utils/colorUtils';
 
 interface TrackData {
   id: string;
@@ -108,7 +109,7 @@ function updateCarPositions() {
         svgCar = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         svgCar.setAttribute('id', `car_${car.car_number}`);
         svgCar.setAttribute('r', '10');
-        svgCar.setAttribute('fill', car.team.color);
+        svgCar.setAttribute('fill', hexToPastel(car.team.color));
         svgCar.setAttribute('style', 'transition: cx 0.5s ease-out, cy 0.5s ease-out;');
         svg.appendChild(svgCar);
 

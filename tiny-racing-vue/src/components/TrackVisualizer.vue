@@ -5,7 +5,7 @@
       v-for="car in cars"
       :key="car.car_number"
       class="car-marker"
-      :style="{ left: `${(car.track_position % 1) * 100}%`, backgroundColor: car.team.color }"
+      :style="{ left: `${(car.track_position % 1) * 100}%`, backgroundColor: hexToPastel(car.team.color) }"
     >
       {{ car.car_number }}
     </div>
@@ -14,8 +14,9 @@
 
 <script setup lang="ts">
 import type { Car } from '@/types';
+import { hexToPastel } from '@/utils/colorUtils';
 
-defineProps<{
+const props = defineProps<{
   cars: Car[];
 }>();
 </script>
