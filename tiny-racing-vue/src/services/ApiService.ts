@@ -576,6 +576,23 @@ export async function unregisterFromRace(raceId: string): Promise<void> {
   }
 }
 
+// Start a race now (loads from DB and starts it)
+export async function startRaceNow(raceId: string): Promise<void> {
+  const response = await apiRequest(`/races/${raceId}/start-now`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to start race: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<null> = await response.json();
+  if (data.status !== 'success') {
+    throw new Error(data.message || 'Failed to start race');
+  }
+}
+
 // Get registrations for a race
 export async function getRaceRegistrations(raceId: string): Promise<RegistrationDb[]> {
   const response = await apiRequest(`/races/${raceId}/registrations`);

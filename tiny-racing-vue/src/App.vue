@@ -96,7 +96,7 @@ onMounted(() => {
 
       <!-- Races view -->
       <div v-show="currentView === 'races'" class="view races-view">
-        <Races :authenticated="authenticated" />
+        <Races :authenticated="authenticated" @navigate="handleNavigate" />
       </div>
 
       <!-- Login view -->

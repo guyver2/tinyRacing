@@ -205,8 +205,9 @@ async fn main() {
 
             // --- Spawn UI Thread (only if not disabled) ---
             // In Docker/headless mode, disable UI to avoid terminal errors
-            let disable_ui = std::env::var("DISABLE_UI").unwrap_or_else(|_| "true".to_string()) == "true";
-            
+            let disable_ui =
+                std::env::var("DISABLE_UI").unwrap_or_else(|_| "true".to_string()) == "true";
+
             if !disable_ui {
                 let ui_log_tx = log_tx.clone(); // Clone for initial messages
                 let initial_track_name_for_ui = track_name.clone();
@@ -236,9 +237,11 @@ async fn main() {
                     }
                 });
                 // Commands are not processed in headless mode (cmd_tx will just drop messages)
-                log_tx.send("Running in headless mode (UI disabled).".to_string()).ok();
+                log_tx
+                    .send("Running in headless mode (UI disabled).".to_string())
+                    .ok();
             }
-            
+
             let ui_log_tx = log_tx.clone();
             ui_log_tx
                 .send(format!("Track loaded: {}:{}", track_id, track_name))

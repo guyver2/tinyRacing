@@ -279,6 +279,7 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
             "/races/{race_id}/registrations",
             get(get_race_registrations),
         )
+        .route("/races/{race_id}/start-now", post(start_race_now))
         .route("/teams/{team_id}", get(get_team))
         .route("/teams/{team_id}/drivers", get(get_team_drivers))
         .route("/teams/{team_id}/cars", get(get_team_cars))
@@ -1621,6 +1622,41 @@ async fn get_race_status(
     };
 
     Ok(success(Some(response), None))
+}
+
+// Start race now - loads a scheduled race from DB and starts it
+async fn start_race_now(
+    Path(race_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    let race_uuid = Uuid::parse_str(&race_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
+
+    // Load the race from the database
+    let new_race_state = crate::models::race::RaceState::load_scheduled_race(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to load race: {}", e)))?;
+
+    // Replace the current race state
+    {
+        let mut race_state_guard = state.race_state.lock().map_err(|_| {
+            ApiError::InternalError("Failed to acquire race state lock".to_string())
+        })?;
+        *race_state_guard = new_race_state;
+    }
+
+    // Start the race
+    let result = commands::handle_command("start".to_string(), state.race_state.clone());
+
+    // Broadcast race update event
+    let _ = broadcast_race_update(&state);
+
+    Ok(success(None, Some(result)))
 }
 
 // Start race

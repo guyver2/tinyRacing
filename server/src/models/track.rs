@@ -1,8 +1,8 @@
+use crate::models::weather::Weather;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Read};
-
-use crate::models::weather::Weather;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct TrackPoint {
@@ -23,6 +23,7 @@ pub struct TrackConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Track {
+    pub uid: Option<Uuid>,
     pub id: String,
     pub name: String,
     pub laps: u32,
@@ -45,6 +46,7 @@ impl Track {
 
         // Create Track from TrackConfig and initialize sampled_track
         let mut track = Track {
+            uid: None,
             id: track_config.id,
             name: track_config.name,
             laps: track_config.laps,

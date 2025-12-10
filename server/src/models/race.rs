@@ -1,8 +1,8 @@
-use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::{self};
-
+use crate::database::models::{DriverDb, TeamDb};
+use crate::database::queries::{
+    get_driver_by_id, get_race_by_id, get_team_by_id, get_track_by_id, list_cars_by_team,
+    list_registrations_by_race,
+};
 use crate::models::car::{Car, CarClientData, CarStats, CarStatus};
 use crate::models::driver::{Driver, DrivingStyle};
 use crate::models::event::{Event, EventData, EventType};
@@ -10,6 +10,13 @@ use crate::models::team::Team;
 use crate::models::tire::{ClientTireData, Tire, TireType};
 use crate::models::track::Track;
 use crate::models::track::TrackClientData;
+use chrono::{DateTime, Utc};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use std::collections::{HashMap, HashSet};
+use std::io::{self};
+use uuid::Uuid;
 
 pub const MAX_PARTICIPANTS: i64 = 5;
 const AUTO_RACE_RESTART: bool = true;
@@ -227,6 +234,7 @@ impl RaceState {
                 (&team_data.driver_2, &team_data.car_2),
             ] {
                 let car = Car {
+                    uid: None,
                     number: car_number,
                     team: team_data.data.clone(),
                     driver: driver.clone(),
@@ -253,6 +261,261 @@ impl RaceState {
                 };
                 cars.insert(car_number, car);
                 car_number += 1;
+            }
+        }
+
+        Ok(RaceState {
+            track,
+            cars,
+            run_state: RaceRunState::Paused, // Start paused
+            tick_count: 0,
+            tick_duration_seconds: 0.1, // 100ms
+            events: Vec::new(),
+        })
+    }
+
+    // Helper function to process a team and add its cars to the race
+    async fn process_team_for_race(
+        pool: &PgPool,
+        team_id: Uuid,
+        cars: &mut HashMap<u32, Car>,
+        mut car_number: u32,
+    ) -> Result<u32, io::Error> {
+        // Load the team
+        let team_db = get_team_by_id(pool, team_id)
+            .await
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Failed to load team: {}", e))
+            })?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Team not found"))?;
+
+        // Convert TeamDb to Team
+        let team = Team {
+            number: team_db.number as u32,
+            name: team_db.name,
+            logo: team_db.logo,
+            color: team_db.color,
+            pit_efficiency: team_db.pit_efficiency,
+        };
+
+        // Load cars for this team
+        let cars_db = list_cars_by_team(pool, team_id).await.map_err(|e| {
+            io::Error::new(io::ErrorKind::Other, format!("Failed to load cars: {}", e))
+        })?;
+
+        // For each car, load its driver and create a Car
+        for car_db in cars_db {
+            // Load the driver for this car (query by car_id)
+            let driver_db = sqlx::query_as::<_, DriverDb>("SELECT * FROM driver WHERE car_id = $1")
+                .bind(car_db.id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Failed to load driver: {}", e),
+                    )
+                })?
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("Driver not found for car {}", car_db.number),
+                    )
+                })?;
+
+            // Convert DriverDb to Driver
+            let driver = Driver {
+                uid: Some(driver_db.id),
+                name: format!("{} {}", driver_db.first_name, driver_db.last_name),
+                skill_level: driver_db.skill_level,
+                stamina: driver_db.stamina,
+                weather_tolerance: driver_db.weather_tolerance,
+                experience: driver_db.experience,
+                consistency: driver_db.consistency,
+                focus: driver_db.focus,
+            };
+
+            // Convert CarDb stats to CarStats
+            let car_stats = CarStats {
+                handling: car_db.handling,
+                acceleration: car_db.acceleration,
+                top_speed: car_db.top_speed,
+                reliability: car_db.reliability,
+                fuel_consumption: car_db.fuel_consumption,
+                tire_wear: car_db.tire_wear,
+            };
+
+            // Create Car
+            let car = Car {
+                uid: Some(car_db.id),
+                number: car_number,
+                team: team.clone(),
+                driver,
+                stats: car_stats,
+                tire: Tire {
+                    type_: TireType::Medium,
+                    wear: 0.0,
+                },
+                fuel: 100.0,
+                driving_style: DrivingStyle::Normal,
+                status: CarStatus::Racing,
+                race_position: car_number,
+                lap: 0,
+                lap_percentage: 0.0,
+                total_distance: 0.0,
+                finished_time: 0,
+                speed: 0.0,
+                base_performance: car_db.base_performance,
+                pit_request: false,
+                target_tire: None,
+                target_fuel: None,
+                pit_time_remaining: 0,
+                player_uuid: team_db.player_id.map(|id| id.to_string()),
+            };
+
+            cars.insert(car_number, car);
+            car_number += 1;
+        }
+
+        Ok(car_number)
+    }
+
+    // Load a scheduled race from the database
+    // load the teams from the registration table for this race
+    // load the track from the track table for this race
+    // load the cars from the cars of the teams of this race
+    // load the drivers from the drivers associated to the cars of this race
+    // load the number of laps for this race.
+    pub async fn load_scheduled_race(pool: &PgPool, race_id: Uuid) -> Result<RaceState, io::Error> {
+        // Load the race from the database
+        let race_db = get_race_by_id(pool, race_id)
+            .await
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Failed to load race: {}", e))
+            })?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Race not found"))?;
+
+        // Load the track from the database
+        let track_db = get_track_by_id(pool, race_db.track_id)
+            .await
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Failed to load track: {}", e))
+            })?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Track not found"))?;
+
+        // Load track configuration from files (using track_id)
+        // Try multiple possible asset directory locations
+        let assets_dir = if let Ok(dir) = std::env::var("ASSETS_DIR") {
+            dir
+        } else {
+            // Try relative path first (for development), then absolute path (for production)
+            if std::path::Path::new("./assets").exists() {
+                "./assets".to_string()
+            } else if std::path::Path::new("../assets").exists() {
+                "../assets".to_string()
+            } else {
+                "/app/assets".to_string()
+            }
+        };
+
+        let track_folder = format!("{}/tracks/{}", assets_dir, track_db.track_id);
+
+        // Try to find the track folder by checking multiple possible locations
+        let track_folder_path = if std::path::Path::new(&track_folder).exists() {
+            track_folder
+        } else {
+            // Try alternative paths
+            let alternatives = vec![
+                format!("./assets/tracks/{}", track_db.track_id),
+                format!("../assets/tracks/{}", track_db.track_id),
+                format!("assets/tracks/{}", track_db.track_id),
+            ];
+
+            alternatives
+                .iter()
+                .find(|path| std::path::Path::new(path).exists())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!(
+                            "Track folder not found for track_id '{}'. Tried: {}, {}, {}, and {}. Please ensure track files exist.",
+                            track_db.track_id,
+                            track_folder,
+                            alternatives[0],
+                            alternatives[1],
+                            alternatives[2]
+                        ),
+                    )
+                })?
+                .clone()
+        };
+
+        let mut track = Track::load_track_config(&track_folder_path).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!(
+                    "Failed to load track configuration from {}: {}",
+                    track_folder_path, e
+                ),
+            )
+        })?;
+        track.laps = race_db.laps as u32;
+
+        // Load registrations for this race
+        let registrations = list_registrations_by_race(pool, race_id)
+            .await
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Failed to load registrations: {}", e),
+                )
+            })?;
+
+        // Collect registered team IDs to exclude them when filling with AI teams
+        let registered_team_ids: HashSet<Uuid> = registrations.iter().map(|r| r.team_id).collect();
+
+        let mut cars = HashMap::new();
+        let mut car_number = 1;
+
+        // Process registered teams
+        for registration in &registrations {
+            car_number =
+                Self::process_team_for_race(pool, registration.team_id, &mut cars, car_number)
+                    .await?;
+        }
+
+        // If we have fewer than MAX_PARTICIPANTS teams, fill with AI teams (player_id IS NULL)
+        let registered_count = registered_team_ids.len() as i64;
+        if registered_count < MAX_PARTICIPANTS {
+            let needed = MAX_PARTICIPANTS - registered_count;
+
+            // Query for teams where player_id IS NULL and not already registered
+            let ai_teams = sqlx::query_as::<_, TeamDb>(
+                r#"
+                SELECT * FROM team 
+                WHERE player_id IS NULL 
+                AND id NOT IN (
+                    SELECT team_id FROM registration WHERE race_id = $1
+                )
+                ORDER BY number
+                LIMIT $2
+                "#,
+            )
+            .bind(race_id)
+            .bind(needed)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Failed to load AI teams: {}", e),
+                )
+            })?;
+
+            // Process AI teams
+            for ai_team in ai_teams {
+                car_number =
+                    Self::process_team_for_race(pool, ai_team.id, &mut cars, car_number).await?;
             }
         }
 
@@ -299,6 +562,7 @@ impl RaceState {
                 let driver = drivers[car_index as usize].clone();
 
                 let car = Car {
+                    uid: None,
                     number: car_number,
                     team: team.clone(),
                     driver,
@@ -597,8 +861,17 @@ impl RaceState {
                 }
             }
 
-            // Update fuel consumption (example rate)
-            let fuel_consumption_rate = 0.001 * car.max_speed(); // Higher performance uses more fuel
+            // Update fuel consumption based on car stats
+            // Base consumption rate (0.0 to 1.0 fuel_consumption stat maps to 0.0005 to 0.002 per second at max speed)
+            let base_fuel_rate = 0.0005 + (car.stats.fuel_consumption * 0.0015);
+            // Scale by current speed relative to max speed
+            let max_speed = car.max_speed();
+            let speed_factor = if max_speed > 0.0 {
+                car.speed / max_speed
+            } else {
+                0.0
+            };
+            let fuel_consumption_rate = base_fuel_rate * speed_factor.max(0.0);
             car.fuel -= fuel_consumption_rate * self.tick_duration_seconds as f32;
             car.fuel = car.fuel.max(0.0);
             if car.fuel == 0.0 && car.status == CarStatus::Racing {
@@ -607,10 +880,21 @@ impl RaceState {
                 car.finished_time = self.tick_count;
             }
 
-            // Update tire wear (example rate)
-            let tire_wear_rate = 0.0005 * car.max_speed(); // Higher performance wears tires faster
-                                                           // TODO: Different wear rates for different tire types
-            car.tire.wear += tire_wear_rate * self.tick_duration_seconds as f32;
+            // Update tire wear based on car stats
+            // Base wear rate (0.0 to 1.0 tire_wear stat maps to 0.0002 to 0.001 per second at max speed)
+            let base_tire_wear_rate = 0.0002 + (car.stats.tire_wear * 0.0008);
+            // Scale by current speed relative to max speed (reuse speed_factor from above)
+            let tire_wear_rate = base_tire_wear_rate * speed_factor.max(0.0);
+            // Different wear rates for different tire types
+            let tire_type_wear_multiplier = match car.tire.type_ {
+                TireType::Soft => 1.5,   // Soft tires wear faster
+                TireType::Medium => 1.0, // Medium is baseline
+                TireType::Hard => 0.7,   // Hard tires wear slower
+                TireType::Intermediate => 1.2,
+                TireType::Wet => 1.3,
+            };
+            car.tire.wear +=
+                tire_wear_rate * tire_type_wear_multiplier * self.tick_duration_seconds as f32;
             car.tire.wear = car.tire.wear.min(100.0); // Cap at 100%?
                                                       // TODO: Consider tire failure above certain wear
 

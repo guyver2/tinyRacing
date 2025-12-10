@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-
+use uuid::Uuid;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum DrivingStyle {
     Relax,
@@ -9,6 +9,7 @@ pub enum DrivingStyle {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Driver {
+    pub uid: Option<Uuid>,
     pub name: String,
     // all skills are 0.0 to 1.0
     pub skill_level: f32,       // how good the driver is at the car

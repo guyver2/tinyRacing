@@ -119,7 +119,7 @@
                   v-if="canRegister(race)"
                   @click="handleRegister(race.id)"
                   class="btn btn-success"
-                  :disabled="registering.get(race.id)"
+                  :disabled="registering.get(race.id) || starting.get(race.id)"
                 >
                   <span v-if="registering.get(race.id)">Registering...</span>
                   <span v-else>Register</span>
@@ -128,12 +128,23 @@
                   v-if="canUnregister(race)"
                   @click="handleUnregister(race.id)"
                   class="btn btn-warning"
-                  :disabled="registering.get(race.id)"
+                  :disabled="registering.get(race.id) || starting.get(race.id)"
                 >
                   <span v-if="registering.get(race.id)">Unregistering...</span>
                   <span v-else>Unregister</span>
                 </button>
               </div>
+            </div>
+            <!-- Start now button for all races -->
+            <div class="race-start-action">
+              <button
+                @click="handleStartNow(race.id)"
+                class="btn btn-primary"
+                :disabled="starting.get(race.id)"
+              >
+                <span v-if="starting.get(race.id)">Starting...</span>
+                <span v-else>Start now</span>
+              </button>
             </div>
           </div>
         </div>
@@ -152,6 +163,7 @@ import {
   registerForRace,
   unregisterFromRace,
   getRaceRegistrations,
+  startRaceNow,
   type RaceDb,
   type CreateRaceRequest,
   type TrackDb,
@@ -174,6 +186,11 @@ const showCreateForm = ref(false);
 const myTeam = ref<TeamDb | null>(null);
 const registrations = ref<Map<string, RegistrationDb>>(new Map());
 const registering = ref<Map<string, boolean>>(new Map());
+const starting = ref<Map<string, boolean>>(new Map());
+
+const emit = defineEmits<{
+  navigate: [view: string];
+}>();
 
 const formData = ref<Omit<CreateRaceRequest, 'status'>>({
   track_id: '',
@@ -276,6 +293,19 @@ async function handleUnregister(raceId: string) {
     error.value = err instanceof Error ? err.message : 'Failed to unregister from race';
   } finally {
     registering.value.set(raceId, false);
+  }
+}
+
+async function handleStartNow(raceId: string) {
+  starting.value.set(raceId, true);
+  try {
+    await startRaceNow(raceId);
+    // Navigate to game view
+    emit('navigate', 'game');
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to start race';
+  } finally {
+    starting.value.set(raceId, false);
   }
 }
 
@@ -707,6 +737,14 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+}
+
+.race-start-action {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
 }
 
 .registration-status {

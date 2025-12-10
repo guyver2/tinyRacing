@@ -69,7 +69,7 @@ db-export-sqlx:
 	cd $(CARGO_DIR) && cargo sqlx prepare --database-url $(DATABASE_URL)
 
 run-sim:
-	cd $(CARGO_DIR) && cargo run -- ../assets/race.json
+	cd $(CARGO_DIR) && DISABLE_UI=false cargo run -- ../assets/race.json
 
 run-vue:
 	cd $(VUE_DIR) && npm install && npm run dev
