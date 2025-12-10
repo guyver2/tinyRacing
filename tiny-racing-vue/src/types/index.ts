@@ -31,6 +31,7 @@ export interface Car {
   status: string;
   driving_style: string;
   speed: number;
+  player_uuid?: string | null;
 }
 
 export interface Track {

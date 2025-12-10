@@ -75,6 +75,7 @@ pub struct RaceState {
     pub tick_count: u64,
     pub tick_duration_seconds: f32,
     pub events: Vec<Event>,
+    pub race_id: Option<Uuid>, // ID of the race in the database (None for races loaded from config files)
 }
 
 pub struct PitDecision {
@@ -271,6 +272,7 @@ impl RaceState {
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
+            race_id: None, // Races loaded from config don't have a database ID
         })
     }
 
@@ -526,6 +528,7 @@ impl RaceState {
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
+            race_id: Some(race_id), // Store the race ID for scheduled races
         })
     }
 
@@ -598,6 +601,7 @@ impl RaceState {
             tick_count: 0,
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
+            race_id: None, // Races created with new() don't have a database ID
         }
     }
 

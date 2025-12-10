@@ -155,6 +155,11 @@ function close() {
 </script>
 
 <style scoped>
+* {
+  box-sizing: border-box;
+  font-family: 'Courier New', monospace;
+}
+
 .strategy-form-overlay {
   position: fixed;
   top: 0;
@@ -169,18 +174,21 @@ function close() {
 }
 
 .strategy-form {
-  background-color: white;
-  border: 2px solid black;
+  background-color: #f9f7f7;
+  border: 1px solid #c9d6df;
+  border-radius: 0;
   width: 90%;
   max-width: 600px;
   padding: 20px;
   position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #2d4059;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
-  border-bottom: 2px solid black;
+  border-bottom: 1px solid #c9d6df;
   padding-bottom: 15px;
   margin-bottom: 15px;
   position: relative;
@@ -192,58 +200,78 @@ function close() {
 }
 
 h2 {
-  font-size: 24px;
+  font-size: 1.1em;
   margin-top: 0;
   margin-bottom: 10px;
+  color: #2d4059;
+  font-weight: bold;
 }
 
 h3 {
-  font-size: 20px;
+  font-size: 1em;
   margin-top: 0;
   margin-bottom: 10px;
+  color: #2d4059;
+  font-weight: bold;
 }
 
 .close-btn {
   position: absolute;
-  top: -15px;
-  right: -15px;
-  background-color: white;
-  border: 2px solid black;
+  top: -10px;
+  right: -10px;
+  background-color: #dbe2ef;
+  border: 1px solid #c9d6df;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 20px;
   font-weight: bold;
+  color: #2d4059;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.close-btn:hover {
+  background-color: #c9d6df;
 }
 
 .driving-styles {
   display: flex;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
 .style-btn {
   flex: 1;
-  margin: 0 5px;
-  padding: 15px;
-  border: 2px solid black;
-  background-color: white;
-  font-size: 18px;
+  padding: 10px 15px;
+  border: 1px solid #c9d6df;
+  background-color: #f9f7f7;
+  border-radius: 4px;
+  font-size: 1em;
   font-weight: bold;
   cursor: pointer;
+  color: #2d4059;
+  transition: background-color 0.2s;
+}
+
+.style-btn:hover {
+  background-color: #dbe2ef;
 }
 
 .style-btn.active {
   background-color: #dbe2ef;
+  border-color: #c9d6df;
 }
 
 .pit-strategy {
-  border: 2px solid black;
+  border: 1px solid #c9d6df;
+  border-radius: 0;
   padding: 15px;
+  background-color: #f9f7f7;
 }
 
 .refuel-section {
@@ -257,27 +285,40 @@ h3 {
 
 .slider {
   width: 100%;
-  height: 10px;
+  height: 8px;
   -webkit-appearance: none;
-  background: #ddd;
+  background: #dbe2ef;
   outline: none;
   margin: 10px 0;
+  border-radius: 4px;
 }
 
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
-  background: black;
+  width: 18px;
+  height: 18px;
+  background: #2d4059;
   cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid #c9d6df;
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #2d4059;
+  cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid #c9d6df;
 }
 
 .slider-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 18px;
+  font-size: 0.9em;
   font-weight: bold;
+  color: #2d4059;
 }
 
 .tire-options {
@@ -290,17 +331,24 @@ h3 {
 .tire-btn {
   width: 48px;
   height: 48px;
-  border: 2px solid black;
-  background-color: white;
+  border: 1px solid #c9d6df;
+  background-color: #f9f7f7;
   padding: 2px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.tire-btn:hover {
+  background-color: #dbe2ef;
 }
 
 .tire-btn.active {
-  border-width: 4px;
+  border: 2px solid #2d4059;
+  background-color: #dbe2ef;
   padding: 0;
 }
 
@@ -312,10 +360,17 @@ h3 {
 .pit-btn {
   margin-left: auto;
   padding: 10px 20px;
-  border: 2px solid black;
-  background-color: white;
-  font-size: 18px;
+  border: 1px solid #c9d6df;
+  background-color: #dbe2ef;
+  border-radius: 4px;
+  font-size: 1em;
   font-weight: bold;
   cursor: pointer;
+  color: #2d4059;
+  transition: background-color 0.2s;
+}
+
+.pit-btn:hover {
+  background-color: #c9d6df;
 }
 </style>

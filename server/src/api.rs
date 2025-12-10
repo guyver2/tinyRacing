@@ -89,6 +89,7 @@ pub enum ApiError {
     BadRequest(String),
     InternalError(String),
     Unauthorized(String),
+    Forbidden(String),
 }
 
 // API Response and Error implementations
@@ -160,6 +161,7 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
             ApiError::InternalError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
             ApiError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
+            ApiError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
         };
 
         let body = Json(ApiResponse::<()> {
@@ -1742,9 +1744,20 @@ async fn get_car_status(
 async fn set_driving_style(
     Path((race_id, car_number)): Path<(u32, u32)>,
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(request): Json<DrivingStyleRequest>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
     assert_eq!(race_id, 1);
+
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Authenticate and verify ownership and registration
+    let player_id = extract_player_id(&headers)?;
+    verify_car_ownership_and_registration(pool, &state.race_state, car_number, player_id).await?;
+
     let command = format!("order {} {}", car_number, request.style);
     let result = commands::handle_command(command, state.race_state.clone());
 
@@ -1758,9 +1771,20 @@ async fn set_driving_style(
 async fn request_pit_stop(
     Path((race_id, car_number)): Path<(u32, u32)>,
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(request): Json<PitStopRequest>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
     assert_eq!(race_id, 1);
+
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Authenticate and verify ownership and registration
+    let player_id = extract_player_id(&headers)?;
+    verify_car_ownership_and_registration(pool, &state.race_state, car_number, player_id).await?;
+
     // Clone the values we'll need multiple times
     let tires_clone = request.tires.clone();
     let refuel_clone = request.refuel;
@@ -1799,6 +1823,90 @@ async fn request_pit_stop(
 }
 
 // Helper functions
+
+// Extract player_id from Authorization header
+fn extract_player_id(headers: &HeaderMap) -> Result<Uuid, ApiError> {
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))
+}
+
+// Verify that the player owns the car and is registered for the race
+async fn verify_car_ownership_and_registration(
+    pool: &PgPool,
+    race_state: &SharedRaceState,
+    car_number: u32,
+    player_id: Uuid,
+) -> Result<(), ApiError> {
+    let (car, race_id) = {
+        let race_state_guard = race_state.lock().map_err(|_| {
+            ApiError::InternalError("Failed to acquire race state lock".to_string())
+        })?;
+
+        let car = race_state_guard
+            .cars
+            .get(&car_number)
+            .ok_or_else(|| ApiError::NotFound(format!("Car number {} not found.", car_number)))?
+            .clone();
+
+        let race_id = race_state_guard.race_id;
+
+        (car, race_id)
+    };
+
+    // Check if car has a player_uuid and if it matches the authenticated player
+    let car_player_uuid = match &car.player_uuid {
+        Some(car_player_uuid_str) => Uuid::parse_str(car_player_uuid_str)
+            .map_err(|_| ApiError::InternalError("Invalid player UUID in car".to_string()))?,
+        None => {
+            // Car has no player_uuid, meaning it's an AI car - no one can control it
+            return Err(ApiError::Forbidden(
+                "This car is not controlled by a player".to_string(),
+            ));
+        }
+    };
+
+    if car_player_uuid != player_id {
+        return Err(ApiError::Forbidden("You do not own this car".to_string()));
+    }
+
+    // If this is a scheduled race (has a race_id), verify the player's team is registered
+    if let Some(race_id) = race_id {
+        let team = get_team_by_player(pool, player_id)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+            .ok_or_else(|| ApiError::Forbidden("You do not have a team".to_string()))?;
+
+        let registration = get_registration(pool, race_id, team.id)
+            .await
+            .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
+
+        if registration.is_none() {
+            return Err(ApiError::Forbidden(
+                "Your team is not registered for this race".to_string(),
+            ));
+        }
+    }
+    // If race_id is None, it's a race loaded from config file - ownership check is sufficient
+
+    Ok(())
+}
 
 // Find the current leader/winner
 fn find_winner(race_state: &SharedRaceState) -> Option<u32> {

@@ -27,6 +27,7 @@
           :class="getRowClasses(car)"
           @click="selectCar(car)"
           :style="{ 'background-color': car.team.color }"
+          :title="isPlayerCar(car) ? 'Click to manage strategy' : 'This is not your car'"
         >
           <td v-if="!collapsed" :class="{ 'top-3': car.race_position <= 3 }">
             {{ car.race_position }}
@@ -68,9 +69,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import type { Car } from '@/types';
 import DriverStrategyForm from './DriverStrategyForm.vue';
+import { getPlayerId } from '@/services/ApiService';
 
 const props = defineProps<{
   cars: Car[];
@@ -83,10 +85,27 @@ const emit = defineEmits<{
 
 const selectedCar = ref<Car | null>(null);
 
+// Get current player ID
+const currentPlayerId = computed(() => getPlayerId());
+
+// Check if a car belongs to the current player
+function isPlayerCar(car: Car): boolean {
+  if (!currentPlayerId.value) {
+    return false;
+  }
+  return car.player_uuid === currentPlayerId.value;
+}
+
 function getRowClasses(car: Car) {
   const classes = [`team`];
   if (car.race_position <= 3) {
     classes.push('top-3');
+  }
+  // Add a class to indicate if this is the player's car
+  if (isPlayerCar(car)) {
+    classes.push('player-car');
+  } else {
+    classes.push('not-player-car');
   }
   return classes;
 }
@@ -96,7 +115,10 @@ function toggleCollapsed() {
 }
 
 function selectCar(car: Car) {
-  selectedCar.value = car;
+  // Only allow selecting the car if it belongs to the current player
+  if (isPlayerCar(car)) {
+    selectedCar.value = car;
+  }
 }
 
 function closeStrategyForm() {
@@ -113,6 +135,16 @@ function closeStrategyForm() {
 .team {
   color: #2d4059;
   cursor: pointer;
+}
+
+.team.player-car {
+  cursor: pointer;
+  /*opacity: 1; */
+}
+
+.team.not-player-car {
+  cursor: not-allowed;
+  /* opacity: 0.6; */
 }
 
 .table-footer {
