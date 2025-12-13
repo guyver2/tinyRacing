@@ -11,6 +11,7 @@ export interface Team {
 }
 
 export interface Driver {
+  uid?: string | null;
   name: string;
   skill_level: number;
   stamina: number;
@@ -32,6 +33,7 @@ export interface Car {
   driving_style: string;
   speed: number;
   player_uuid?: string | null;
+  pit_requested?: boolean | null;
 }
 
 export interface Track {

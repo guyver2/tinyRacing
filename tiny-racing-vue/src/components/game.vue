@@ -1,14 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import RaceHeader from './RaceHeader.vue';
 import CarsTable from './CarsTable.vue';
 import TrackVisualizer from './TrackVisualizer.vue';
 import TrackSvg from './TrackSvg.vue';
 import ConnectionStatus from './ConnectionStatus.vue';
+import DriverControl from './DriverControl.vue';
 import { useRaceData } from '../services/WebSocketService';
+import { getPlayerId, isAuthenticated } from '../services/ApiService';
+import type { Car } from '@/types';
 
 const { raceState, connected } = useRaceData();
 const isCarTableCollapsed = ref(true);
+
+// Get current player ID
+const currentPlayerId = computed(() => getPlayerId());
+
+// Filter cars to only show player's cars, ordered by car number
+const playerCars = computed(() => {
+  if (!isAuthenticated() || !currentPlayerId.value) {
+    return [];
+  }
+  return raceState.value.cars
+    .filter((car: Car) => car.player_uuid === currentPlayerId.value)
+    .sort((a: Car, b: Car) => a.car_number - b.car_number);
+});
 </script>
 
 <template>
@@ -29,6 +45,9 @@ const isCarTableCollapsed = ref(true);
         <div class="sidebar" :class="{ expanded: !isCarTableCollapsed }">
           <div class="cars-table-container">
             <CarsTable :cars="raceState.cars" v-model:collapsed="isCarTableCollapsed" />
+          </div>
+          <div v-if="playerCars.length > 0" class="driver-controls-container">
+            <DriverControl v-for="car in playerCars" :key="car.car_number" :car="car" />
           </div>
         </div>
 
@@ -60,6 +79,7 @@ const isCarTableCollapsed = ref(true);
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  overflow-x: hidden;
 }
 
 .main-content {
@@ -68,6 +88,7 @@ const isCarTableCollapsed = ref(true);
   position: relative;
   margin-bottom: 0;
   height: calc(100% - 150px);
+  overflow-x: hidden;
 }
 
 .game-content {
@@ -77,21 +98,25 @@ const isCarTableCollapsed = ref(true);
   margin-bottom: 0;
   height: 100%;
   width: 100%;
+  overflow-x: hidden;
 }
 
 .sidebar {
-  width: 20%;
-  max-width: 250px;
-  min-width: 150px;
+  width: 30%;
+  max-width: 375px;
+  min-width: 225px;
   transition: width 0.3s ease;
   position: absolute;
   background-color: #f9f7f7;
   border-radius: 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  height: auto;
+  overflow-y: auto;
+  overflow-x: visible;
+  height: 100%;
   z-index: 5;
   left: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar.expanded {
@@ -102,14 +127,22 @@ const isCarTableCollapsed = ref(true);
 }
 
 .cars-table-container {
-  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  flex-shrink: 0;
+}
+
+.driver-controls-container {
+  padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .track-content {
   position: absolute;
-  left: min(20%, 250px);
+  left: min(30%, 375px);
   right: 0;
   height: 100%;
   border-radius: 0;

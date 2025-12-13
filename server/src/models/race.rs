@@ -613,6 +613,7 @@ impl RaceState {
                     speed: car.speed, // Use the speed from Car struct
                     finished_time: car.finished_time,
                     player_uuid: car.player_uuid.clone(),
+                    pit_requested: Some(car.pit_request),
                 }
             })
             .collect();
@@ -851,7 +852,7 @@ impl RaceState {
 
             // Update fuel consumption based on car stats
             // Base consumption rate (0.0 to 1.0 fuel_consumption stat maps to 0.0005 to 0.002 per second at max speed)
-            let base_fuel_rate = 0.0005 + (car.stats.fuel_consumption * 0.0015);
+            let base_fuel_rate = 0.0005 + (car.stats.fuel_consumption * 0.15);
             // Scale by current speed relative to max speed
             let max_speed = car.max_speed();
             let speed_factor = if max_speed > 0.0 {
@@ -870,7 +871,7 @@ impl RaceState {
 
             // Update tire wear based on car stats
             // Base wear rate (0.0 to 1.0 tire_wear stat maps to 0.0002 to 0.001 per second at max speed)
-            let base_tire_wear_rate = 0.0002 + (car.stats.tire_wear * 0.0008);
+            let base_tire_wear_rate = 0.0002 + (car.stats.tire_wear * 0.08);
             // Scale by current speed relative to max speed (reuse speed_factor from above)
             let tire_wear_rate = base_tire_wear_rate * speed_factor.max(0.0);
             // Different wear rates for different tire types

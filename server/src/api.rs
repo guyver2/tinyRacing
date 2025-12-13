@@ -132,9 +132,12 @@ struct DrivingStyleRequest {
 
 #[derive(Deserialize)]
 struct PitStopRequest {
+    #[serde(default)]
     tires: Option<String>,
-    #[serde(deserialize_with = "deserialize_refuel")]
+    #[serde(deserialize_with = "deserialize_refuel", default)]
     refuel: Option<f32>,
+    #[serde(default)]
+    cancel: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -1771,6 +1774,21 @@ async fn request_pit_stop(
     // Authenticate and verify ownership and registration
     let player_id = extract_player_id(&headers)?;
     verify_car_ownership_and_registration(pool, &state.race_state, car_number, player_id).await?;
+
+    // Handle cancel request
+    if request.cancel == Some(true) {
+        let command = format!("nopit {}", car_number);
+        let result = commands::handle_command(command, state.race_state.clone());
+
+        // Broadcast pit stop cancel event
+        let _ = state.live_tx.send(LiveEvent::PitStop(PitStopEvent {
+            car_number,
+            tires: None,
+            refuel: None,
+        }));
+
+        return Ok(success(None, Some(result)));
+    }
 
     // Clone the values we'll need multiple times
     let tires_clone = request.tires.clone();

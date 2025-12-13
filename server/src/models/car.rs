@@ -149,4 +149,5 @@ pub struct CarClientData {
     pub speed: f32,         // Current speed in km/h
     pub finished_time: u64, // Ticks taken to finish
     pub player_uuid: Option<String>,
+    pub pit_requested: Option<bool>,
 }
