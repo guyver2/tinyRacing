@@ -128,7 +128,6 @@ function closeStrategyForm() {
 </script>
 
 <style scoped>
-
 .cars-table-wrapper {
   position: relative;
   width: 100%;

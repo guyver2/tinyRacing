@@ -64,7 +64,6 @@ async function startStopRace() {
 </script>
 
 <style scoped>
-
 header {
   display: flex;
   justify-content: space-between;

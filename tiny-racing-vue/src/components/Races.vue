@@ -69,84 +69,207 @@
 
       <!-- Races list -->
       <div v-if="!loading && !error" class="races-list">
-        <h3>All Races</h3>
-        <div v-if="races.length === 0" class="empty-state">
-          <p>No races found. Create one to get started!</p>
-        </div>
-        <div v-else class="races-grid">
-          <div
-            v-for="race in races"
-            :key="race.id"
-            class="race-card"
-            :class="getRaceStatusClass(race.status)"
-          >
-            <div class="race-header">
-              <h4>{{ getTrackName(race.track_id) }}</h4>
-              <span class="status-badge" :class="getRaceStatusClass(race.status)">
-                {{ formatStatus(race.status) }}
-              </span>
-            </div>
-            <div class="race-details">
-              <div class="detail-item">
-                <span class="detail-label">Laps:</span>
-                <span class="detail-value">{{ race.laps }}</span>
+        <!-- Upcoming Races Section (REGISTRATION_OPEN, REGISTRATION_CLOSED) -->
+        <div v-if="upcomingRaces.length > 0" class="race-section">
+          <h3 class="section-header">Upcoming Races</h3>
+          <div class="races-grid">
+            <div
+              v-for="race in upcomingRaces"
+              :key="race.id"
+              class="race-card"
+              :class="getRaceStatusClass(race.status)"
+            >
+              <div class="race-header">
+                <h4>{{ getTrackName(race.track_id) }}</h4>
+                <span class="status-badge" :class="getRaceStatusClass(race.status)">
+                  {{ formatStatus(race.status) }}
+                </span>
               </div>
-              <div v-if="race.start_datetime" class="detail-item">
-                <span class="detail-label">Start Date:</span>
-                <span class="detail-value">{{ formatDate(race.start_datetime) }}</span>
+              <div class="race-details">
+                <div class="detail-item">
+                  <span class="detail-label">Laps:</span>
+                  <span class="detail-value">{{ race.laps }}</span>
+                </div>
+                <div v-if="race.start_datetime" class="detail-item">
+                  <span class="detail-label">Start Date:</span>
+                  <span class="detail-value">{{ formatDate(race.start_datetime) }}</span>
+                </div>
+                <div v-if="race.description" class="detail-item">
+                  <span class="detail-label">Description:</span>
+                  <span class="detail-value">{{ race.description }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Created:</span>
+                  <span class="detail-value">{{ formatDate(race.created_at) }}</span>
+                </div>
               </div>
-              <div v-if="race.description" class="detail-item">
-                <span class="detail-label">Description:</span>
-                <span class="detail-value">{{ race.description }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Created:</span>
-                <span class="detail-value">{{ formatDate(race.created_at) }}</span>
-              </div>
-            </div>
-            <!-- Registration section for authenticated users with a team -->
-            <div v-if="authenticated && myTeam" class="race-actions">
-              <div v-if="isRegistered(race.id)" class="registration-status registered">
-                <span class="registration-icon">✓</span>
-                <span>Registered</span>
-              </div>
-              <!-- <div v-else-if="race.status === 'REGISTRATION_CLOSED'" class="registration-status full">
+              <!-- Registration section for authenticated users with a team -->
+              <div v-if="authenticated && myTeam" class="race-actions">
+                <div v-if="isRegistered(race.id)" class="registration-status registered">
+                  <span class="registration-icon">✓</span>
+                  <span>Registered</span>
+                </div>
+                <!-- <div v-else-if="race.status === 'REGISTRATION_CLOSED'" class="registration-status full">
                 <span class="registration-icon">✗</span>
                 <span>Registration Closed</span>
               </div> -->
-              <div class="action-buttons">
+                <div class="action-buttons">
+                  <button
+                    v-if="canRegister(race)"
+                    @click="handleRegister(race.id)"
+                    class="btn btn-success"
+                    :disabled="registering.get(race.id) || starting.get(race.id)"
+                  >
+                    <span v-if="registering.get(race.id)">Registering...</span>
+                    <span v-else>Register</span>
+                  </button>
+                  <button
+                    v-if="canUnregister(race)"
+                    @click="handleUnregister(race.id)"
+                    class="btn btn-warning"
+                    :disabled="registering.get(race.id) || starting.get(race.id)"
+                  >
+                    <span v-if="registering.get(race.id)">Unregistering...</span>
+                    <span v-else>Unregister</span>
+                  </button>
+                </div>
+              </div>
+              <!-- Start now button for all races -->
+              <div class="race-start-action">
                 <button
-                  v-if="canRegister(race)"
-                  @click="handleRegister(race.id)"
-                  class="btn btn-success"
-                  :disabled="registering.get(race.id) || starting.get(race.id)"
+                  @click="handleStartNow(race.id)"
+                  class="btn btn-primary"
+                  :disabled="starting.get(race.id)"
                 >
-                  <span v-if="registering.get(race.id)">Registering...</span>
-                  <span v-else>Register</span>
-                </button>
-                <button
-                  v-if="canUnregister(race)"
-                  @click="handleUnregister(race.id)"
-                  class="btn btn-warning"
-                  :disabled="registering.get(race.id) || starting.get(race.id)"
-                >
-                  <span v-if="registering.get(race.id)">Unregistering...</span>
-                  <span v-else>Unregister</span>
+                  <span v-if="starting.get(race.id)">Starting...</span>
+                  <span v-else>Start now</span>
                 </button>
               </div>
             </div>
-            <!-- Start now button for all races -->
-            <div class="race-start-action">
-              <button
-                @click="handleStartNow(race.id)"
-                class="btn btn-primary"
-                :disabled="starting.get(race.id)"
-              >
-                <span v-if="starting.get(race.id)">Starting...</span>
-                <span v-else>Start now</span>
-              </button>
+          </div>
+        </div>
+
+        <!-- Ongoing Races Section -->
+        <div v-if="ongoingRaces.length > 0" class="race-section">
+          <h3 class="section-header">Ongoing Races</h3>
+          <div class="races-grid">
+            <div
+              v-for="race in ongoingRaces"
+              :key="race.id"
+              class="race-card"
+              :class="getRaceStatusClass(race.status)"
+            >
+              <div class="race-header">
+                <h4>{{ getTrackName(race.track_id) }}</h4>
+                <span class="status-badge" :class="getRaceStatusClass(race.status)">
+                  {{ formatStatus(race.status) }}
+                </span>
+              </div>
+              <div class="race-details">
+                <div class="detail-item">
+                  <span class="detail-label">Laps:</span>
+                  <span class="detail-value">{{ race.laps }}</span>
+                </div>
+                <div v-if="race.start_datetime" class="detail-item">
+                  <span class="detail-label">Start Date:</span>
+                  <span class="detail-value">{{ formatDate(race.start_datetime) }}</span>
+                </div>
+                <div v-if="race.description" class="detail-item">
+                  <span class="detail-label">Description:</span>
+                  <span class="detail-value">{{ race.description }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Created:</span>
+                  <span class="detail-value">{{ formatDate(race.created_at) }}</span>
+                </div>
+              </div>
+              <!-- View race button for ongoing races -->
+              <div class="race-start-action">
+                <button @click="handleViewRace(race.id)" class="btn btn-primary">View Race</button>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- Finished Races Section -->
+        <div v-if="finishedRaces.length > 0" class="race-section">
+          <h3 class="section-header">Finished Races</h3>
+          <div class="races-grid">
+            <div
+              v-for="race in finishedRaces"
+              :key="race.id"
+              class="race-card"
+              :class="getRaceStatusClass(race.status)"
+            >
+              <div class="race-header">
+                <h4>{{ getTrackName(race.track_id) }}</h4>
+                <span class="status-badge" :class="getRaceStatusClass(race.status)">
+                  {{ formatStatus(race.status) }}
+                </span>
+              </div>
+              <div class="race-details">
+                <div class="detail-item">
+                  <span class="detail-label">Laps:</span>
+                  <span class="detail-value">{{ race.laps }}</span>
+                </div>
+                <div v-if="race.start_datetime" class="detail-item">
+                  <span class="detail-label">Start Date:</span>
+                  <span class="detail-value">{{ formatDate(race.start_datetime) }}</span>
+                </div>
+                <div v-if="race.description" class="detail-item">
+                  <span class="detail-label">Description:</span>
+                  <span class="detail-value">{{ race.description }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Created:</span>
+                  <span class="detail-value">{{ formatDate(race.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canceled Races Section -->
+        <div v-if="canceledRaces.length > 0" class="race-section">
+          <h3 class="section-header">Canceled Races</h3>
+          <div class="races-grid">
+            <div
+              v-for="race in canceledRaces"
+              :key="race.id"
+              class="race-card"
+              :class="getRaceStatusClass(race.status)"
+            >
+              <div class="race-header">
+                <h4>{{ getTrackName(race.track_id) }}</h4>
+                <span class="status-badge" :class="getRaceStatusClass(race.status)">
+                  {{ formatStatus(race.status) }}
+                </span>
+              </div>
+              <div class="race-details">
+                <div class="detail-item">
+                  <span class="detail-label">Laps:</span>
+                  <span class="detail-value">{{ race.laps }}</span>
+                </div>
+                <div v-if="race.start_datetime" class="detail-item">
+                  <span class="detail-label">Start Date:</span>
+                  <span class="detail-value">{{ formatDate(race.start_datetime) }}</span>
+                </div>
+                <div v-if="race.description" class="detail-item">
+                  <span class="detail-label">Description:</span>
+                  <span class="detail-value">{{ race.description }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Created:</span>
+                  <span class="detail-value">{{ formatDate(race.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-if="races.length === 0" class="empty-state">
+          <p>No races found. Create one to get started!</p>
         </div>
       </div>
     </div>
@@ -154,7 +277,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   getRaces,
   createRace,
@@ -197,6 +320,25 @@ const formData = ref<Omit<CreateRaceRequest, 'status'>>({
   laps: 10,
   start_datetime: null,
   description: null,
+});
+
+// Filter races by status
+const upcomingRaces = computed(() => {
+  return races.value.filter(
+    (race) => race.status === 'REGISTRATION_OPEN' || race.status === 'REGISTRATION_CLOSED',
+  );
+});
+
+const ongoingRaces = computed(() => {
+  return races.value.filter((race) => race.status === 'ONGOING');
+});
+
+const finishedRaces = computed(() => {
+  return races.value.filter((race) => race.status === 'FINISHED');
+});
+
+const canceledRaces = computed(() => {
+  return races.value.filter((race) => race.status === 'CANCELED');
 });
 
 async function loadRaces() {
@@ -307,6 +449,11 @@ async function handleStartNow(raceId: string) {
   } finally {
     starting.value.set(raceId, false);
   }
+}
+
+function handleViewRace(raceId: string) {
+  // For ongoing races, just navigate to the game view without restarting
+  emit('navigate', 'game');
 }
 
 const isRegistered = (raceId: string): boolean => {
@@ -610,10 +757,16 @@ onMounted(async () => {
   color: #2e7d32;
 }
 
-.races-list h3 {
+.race-section {
+  margin-bottom: 3rem;
+}
+
+.section-header {
   color: #1a1a2e;
   font-size: 1.5rem;
   margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e0e0e0;
 }
 
 .empty-state {

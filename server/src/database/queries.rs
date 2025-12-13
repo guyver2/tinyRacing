@@ -877,3 +877,41 @@ pub async fn update_race_status(
 
     Ok(race)
 }
+
+/// Start a race by setting its status to ONGOING and recording the start datetime
+pub async fn start_race(pool: &PgPool, race_id: Uuid) -> Result<RaceDb, sqlx::Error> {
+    use chrono::Utc;
+    let now = Utc::now();
+
+    let race = sqlx::query_as::<_, RaceDb>(
+        r#"
+        UPDATE race
+        SET status = 'ONGOING'::race_status, start_datetime = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        "#,
+    )
+    .bind(race_id)
+    .bind(now)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(race)
+}
+
+/// Finish a race by setting its status to FINISHED
+pub async fn finish_race(pool: &PgPool, race_id: Uuid) -> Result<RaceDb, sqlx::Error> {
+    let race = sqlx::query_as::<_, RaceDb>(
+        r#"
+        UPDATE race
+        SET status = 'FINISHED'::race_status, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        "#,
+    )
+    .bind(race_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(race)
+}

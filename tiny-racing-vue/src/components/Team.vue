@@ -78,12 +78,12 @@
               <h4 class="section-title-small">Upcoming Races</h4>
               <div v-if="loadingRegistrations" class="loading-small">Loading races...</div>
               <div v-else-if="errorRegistrations" class="error-small">{{ errorRegistrations }}</div>
-              <div v-else-if="registeredRaces.length === 0" class="no-races">
+              <div v-else-if="upcomingRaces.length === 0" class="no-races">
                 <p>No upcoming races</p>
               </div>
               <div v-else class="races-list">
                 <div
-                  v-for="raceReg in registeredRaces"
+                  v-for="raceReg in upcomingRaces"
                   :key="raceReg.registration_id"
                   class="race-card-small"
                 >
@@ -342,6 +342,14 @@ const sortedCars = computed(() => {
 // Get substitute drivers (those without car_id)
 const substituteDrivers = computed(() => {
   return drivers.value.filter((driver) => driver.car_id === null);
+});
+
+// Filter races to only show non-started races (REGISTRATION_OPEN or REGISTRATION_CLOSED)
+const upcomingRaces = computed(() => {
+  return registeredRaces.value.filter(
+    (race) =>
+      race.race_status === 'REGISTRATION_OPEN' || race.race_status === 'REGISTRATION_CLOSED',
+  );
 });
 
 // Helper function to get driver for a car

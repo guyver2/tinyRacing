@@ -22,7 +22,7 @@ mod ncurses_ui;
 use crate::ncurses_ui::*;
 
 mod database;
-use crate::database::{init_from_env, Database};
+use crate::database::{finish_race, init_from_env, Database};
 mod api;
 mod auth;
 mod auth_middleware;
@@ -193,6 +193,9 @@ async fn main() {
                 init_from_env().await
             };
 
+            // Clone db_pool for the game loop
+            let game_loop_db_pool = db_pool.clone();
+
             // Start the API server in a separate task
             tokio::spawn(async move {
                 let app = api::create_api_router(api_race_state, db_pool);
@@ -263,15 +266,19 @@ async fn main() {
                 loop {
                     interval.tick().await;
                     let client_view_opt: Option<RaceStateClientView>;
+                    let race_id_opt: Option<Uuid>;
+                    let race_just_finished: bool;
                     let should_restart = {
                         let mut state_guard = game_state_clone_loop.lock().unwrap();
                         let previous_run_state = state_guard.run_state.clone();
+                        race_id_opt = state_guard.race_id;
                         state_guard.update();
                         client_view_opt = Some(state_guard.get_client_view());
 
-                        let should_restart = if state_guard.run_state == RaceRunState::Finished
-                            && previous_run_state != RaceRunState::Finished
-                        {
+                        race_just_finished = state_guard.run_state == RaceRunState::Finished
+                            && previous_run_state != RaceRunState::Finished;
+
+                        let should_restart = if race_just_finished {
                             game_log_tx.send("Race Finished!".to_string()).ok();
                             // Check if auto restart is enabled
                             crate::models::race::is_auto_race_restart_enabled()
@@ -280,6 +287,23 @@ async fn main() {
                         };
                         should_restart
                     };
+
+                    // Update database status to FINISHED if this is a scheduled race that just finished
+                    // Do this outside the mutex guard to avoid holding it across await
+                    if race_just_finished {
+                        if let Some(race_id) = race_id_opt {
+                            if let Some(pool) = &game_loop_db_pool {
+                                if let Err(e) = finish_race(pool, race_id).await {
+                                    game_log_tx
+                                        .send(format!(
+                                            "Failed to update race status to FINISHED: {:?}",
+                                            e
+                                        ))
+                                        .ok();
+                                }
+                            }
+                        }
+                    }
 
                     // Restart race if needed
                     if should_restart {

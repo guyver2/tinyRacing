@@ -1,5 +1,6 @@
 use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
 use crate::commands;
+use crate::database::queries::start_race as start_race_in_db;
 use crate::database::{
     assign_car_to_team, assign_driver_to_car, assign_driver_to_team, count_cars_by_team,
     count_drivers_by_team, count_registrations_by_race, create_race, create_registration,
@@ -1651,6 +1652,11 @@ async fn start_race_now(
         })?;
         *race_state_guard = new_race_state;
     }
+
+    // Update race status to ONGOING and set start_datetime
+    start_race_in_db(pool, race_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to start race: {:?}", e)))?;
 
     // Start the race
     let result = commands::handle_command("start".to_string(), state.race_state.clone());

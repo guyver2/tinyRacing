@@ -77,12 +77,12 @@
               <!-- Upcoming Races Section -->
               <div class="upcoming-races-section">
                 <h4 class="section-title-small">Upcoming Races</h4>
-                <div v-if="expandedTeamData.registeredRaces.length === 0" class="no-races">
+                <div v-if="upcomingRacesForExpandedTeam.length === 0" class="no-races">
                   <p>No upcoming races</p>
                 </div>
                 <div v-else class="races-list">
                   <div
-                    v-for="raceReg in expandedTeamData.registeredRaces"
+                    v-for="raceReg in upcomingRacesForExpandedTeam"
                     :key="raceReg.registration_id"
                     class="race-card-small"
                   >
@@ -310,6 +310,15 @@ function getDriverForCar(car: CarDb): DriverDb | undefined {
   if (!expandedTeamData.value) return undefined;
   return expandedTeamData.value.drivers.find((driver) => driver.car_id === car.id);
 }
+
+// Filter races to only show non-started races (REGISTRATION_OPEN or REGISTRATION_CLOSED)
+const upcomingRacesForExpandedTeam = computed(() => {
+  if (!expandedTeamData.value) return [];
+  return expandedTeamData.value.registeredRaces.filter(
+    (race) =>
+      race.race_status === 'REGISTRATION_OPEN' || race.race_status === 'REGISTRATION_CLOSED',
+  );
+});
 
 async function loadTeams() {
   loading.value = true;
