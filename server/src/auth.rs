@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::database::{get_player_by_username, JwtTokenDb};
+use crate::database::queries as tdb;
+use crate::database::JwtTokenDb;
 
 // JWT secret key - in production, this should be loaded from environment variables
 const JWT_SECRET: &str = "your-secret-key-change-in-production";
@@ -98,7 +99,7 @@ pub async fn authenticate_user(
     password: &str,
 ) -> Result<(Uuid, String), AuthError> {
     // Get player from database
-    let player = get_player_by_username(pool, username)
+    let player = tdb::get_player_by_username(pool, username)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?
         .ok_or(AuthError::InvalidCredentials)?;
@@ -128,62 +129,37 @@ pub async fn store_token(
 ) -> Result<JwtTokenDb, AuthError> {
     let expires_at = Utc::now() + Duration::hours(JWT_EXPIRY_HOURS);
 
-    let jwt_token = sqlx::query_as::<_, JwtTokenDb>(
-        r#"
-        INSERT INTO jwt_token (player_id, token, expires_at)
-        VALUES ($1, $2, $3)
-        RETURNING *
-        "#,
-    )
-    .bind(player_id)
-    .bind(token)
-    .bind(expires_at)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let jwt_token = tdb::create_jwt_token(pool, player_id, token, expires_at)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     Ok(jwt_token)
 }
 
 // Validate token exists in database and is not expired
 pub async fn validate_token_in_db(pool: &PgPool, token: &str) -> Result<JwtTokenDb, AuthError> {
-    let jwt_token = sqlx::query_as::<_, JwtTokenDb>(
-        r#"
-        SELECT * FROM jwt_token
-        WHERE token = $1 AND expires_at > NOW()
-        "#,
-    )
-    .bind(token)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-    .ok_or(AuthError::TokenExpired)?;
+    let jwt_token = tdb::get_jwt_token_by_token(pool, token)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
+        .ok_or(AuthError::TokenExpired)?;
 
     Ok(jwt_token)
 }
 
 // Delete expired tokens (cleanup function)
 pub async fn cleanup_expired_tokens(pool: &PgPool) -> Result<u64, AuthError> {
-    let result = sqlx::query(
-        r#"
-        DELETE FROM jwt_token
-        WHERE expires_at < NOW()
-        "#,
-    )
-    .execute(pool)
-    .await
-    .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let count = tdb::delete_expired_jwt_tokens(pool)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
-    Ok(result.rows_affected())
+    Ok(count)
 }
 
 // Delete a specific token (logout)
 pub async fn delete_token(pool: &PgPool, token: &str) -> Result<bool, AuthError> {
-    let result = sqlx::query("DELETE FROM jwt_token WHERE token = $1")
-        .bind(token)
-        .execute(pool)
+    let deleted = tdb::delete_jwt_token_by_token(pool, token)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
-    Ok(result.rows_affected() > 0)
+    Ok(deleted)
 }

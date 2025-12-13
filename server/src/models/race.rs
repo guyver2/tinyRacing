@@ -1,8 +1,5 @@
 use crate::database::models::{DriverDb, TeamDb};
-use crate::database::queries::{
-    get_driver_by_id, get_race_by_id, get_team_by_id, get_track_by_id, list_cars_by_team,
-    list_registrations_by_race,
-};
+use crate::database::queries as tdb;
 use crate::models::car::{Car, CarClientData, CarStats, CarStatus};
 use crate::models::driver::{Driver, DrivingStyle};
 use crate::models::event::{Event, EventData, EventType};
@@ -284,7 +281,7 @@ impl RaceState {
         mut car_number: u32,
     ) -> Result<u32, io::Error> {
         // Load the team
-        let team_db = get_team_by_id(pool, team_id)
+        let team_db = tdb::get_team_by_id(pool, team_id)
             .await
             .map_err(|e| {
                 io::Error::new(io::ErrorKind::Other, format!("Failed to load team: {}", e))
@@ -301,7 +298,7 @@ impl RaceState {
         };
 
         // Load cars for this team
-        let cars_db = list_cars_by_team(pool, team_id).await.map_err(|e| {
+        let cars_db = tdb::list_cars_by_team(pool, team_id).await.map_err(|e| {
             io::Error::new(io::ErrorKind::Other, format!("Failed to load cars: {}", e))
         })?;
 
@@ -390,7 +387,7 @@ impl RaceState {
     // load the number of laps for this race.
     pub async fn load_scheduled_race(pool: &PgPool, race_id: Uuid) -> Result<RaceState, io::Error> {
         // Load the race from the database
-        let race_db = get_race_by_id(pool, race_id)
+        let race_db = tdb::get_race_by_id(pool, race_id)
             .await
             .map_err(|e| {
                 io::Error::new(io::ErrorKind::Other, format!("Failed to load race: {}", e))
@@ -398,7 +395,7 @@ impl RaceState {
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Race not found"))?;
 
         // Load the track from the database
-        let track_db = get_track_by_id(pool, race_db.track_id)
+        let track_db = tdb::get_track_by_id(pool, race_db.track_id)
             .await
             .map_err(|e| {
                 io::Error::new(io::ErrorKind::Other, format!("Failed to load track: {}", e))
@@ -464,7 +461,7 @@ impl RaceState {
         track.laps = race_db.laps as u32;
 
         // Load registrations for this race
-        let registrations = list_registrations_by_race(pool, race_id)
+        let registrations = tdb::list_registrations_by_race(pool, race_id)
             .await
             .map_err(|e| {
                 io::Error::new(
@@ -492,27 +489,14 @@ impl RaceState {
             let needed = MAX_PARTICIPANTS - registered_count;
 
             // Query for teams where player_id IS NULL and not already registered
-            let ai_teams = sqlx::query_as::<_, TeamDb>(
-                r#"
-                SELECT * FROM team 
-                WHERE player_id IS NULL 
-                AND id NOT IN (
-                    SELECT team_id FROM registration WHERE race_id = $1
-                )
-                ORDER BY number
-                LIMIT $2
-                "#,
-            )
-            .bind(race_id)
-            .bind(needed)
-            .fetch_all(pool)
-            .await
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Failed to load AI teams: {}", e),
-                )
-            })?;
+            let ai_teams = tdb::list_ai_teams_not_registered_for_race(pool, race_id, needed)
+                .await
+                .map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Failed to load AI teams: {}", e),
+                    )
+                })?;
 
             // Process AI teams
             for ai_team in ai_teams {

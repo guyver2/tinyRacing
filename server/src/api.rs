@@ -1,21 +1,9 @@
-use crate::auth::{authenticate_user, delete_token, hash_password, store_token, AuthError};
+use crate::auth::{authenticate_user, delete_token, store_token, AuthError};
 use crate::commands;
-use crate::database::queries::start_race as start_race_in_db;
+use crate::database::queries as tdb;
 use crate::database::{
-    assign_car_to_team, assign_driver_to_car, assign_driver_to_team, count_cars_by_team,
-    count_drivers_by_team, count_registrations_by_race, create_race, create_registration,
-    delete_registration, get_race_by_id, get_registration, list_cars, list_cars_by_team,
-    list_drivers, list_drivers_by_team, list_players, list_races,
-    list_registrations_with_race_details_by_team, list_teams, list_teams_by_player, list_tracks,
-    list_unassigned_cars, list_unassigned_drivers, update_race_status, update_team_cash,
-    CreateRaceRequest,
-};
-use crate::database::{
-    create_team, CreateTeamRequest, LoginRequest, LoginResponse, RegisterRequest,
-};
-use crate::database::{
-    get_car_by_id, get_driver_by_id, get_player_by_id, get_team_by_id, get_team_by_player,
-    get_track_by_id,
+    CreatePlayerRequest, CreateRaceRequest, CreateTeamRequest, LoginRequest, LoginResponse,
+    RegisterRequest,
 };
 use crate::models::car::CarStatus;
 use crate::models::driver_avatar::generate_driver_avatar;
@@ -365,11 +353,11 @@ async fn get_teams(
         let player_id = Uuid::parse_str(&player_id_str).map_err(|_| {
             ApiError::BadRequest(format!("Invalid player ID format: {}", player_id_str))
         })?;
-        list_teams_by_player(pool, player_id)
+        tdb::list_teams_by_player(pool, player_id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
     } else {
-        list_teams(pool)
+        tdb::list_teams(pool)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
     };
@@ -389,7 +377,7 @@ async fn get_team(
     let uuid = Uuid::parse_str(&team_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
-    let team = get_team_by_id(pool, uuid)
+    let team = tdb::get_team_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Team with ID {} not found", team_id)))?;
@@ -429,7 +417,7 @@ async fn get_my_team(
     let player_id =
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?;
 
@@ -476,7 +464,7 @@ async fn create_team_handler(
 
     // Check if player already has a team
     if let Some(pid) = final_player_id {
-        let existing_team = get_team_by_player(pool, pid).await.map_err(|e| {
+        let existing_team = tdb::get_team_by_player(pool, pid).await.map_err(|e| {
             ApiError::InternalError(format!("Failed to check existing team: {}", e))
         })?;
 
@@ -503,7 +491,7 @@ async fn create_team_handler(
         }
     }
 
-    let team = create_team(pool, team_request)
+    let team = tdb::create_team(pool, team_request)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to create team: {}", e)))?;
 
@@ -521,7 +509,7 @@ async fn get_drivers(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let drivers = list_drivers(pool)
+    let drivers = tdb::list_drivers(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
 
@@ -543,7 +531,7 @@ async fn get_unassigned_drivers(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let drivers = list_unassigned_drivers(pool).await.map_err(|e| {
+    let drivers = tdb::list_unassigned_drivers(pool).await.map_err(|e| {
         ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e))
     })?;
 
@@ -569,7 +557,7 @@ async fn get_driver(
     let uuid = Uuid::parse_str(&driver_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
 
-    let driver = get_driver_by_id(pool, uuid)
+    let driver = tdb::get_driver_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
@@ -614,7 +602,7 @@ async fn buy_driver(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Get the player's team
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
@@ -624,7 +612,7 @@ async fn buy_driver(
         .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
 
     // Get the driver
-    let driver = get_driver_by_id(pool, driver_uuid)
+    let driver = tdb::get_driver_by_id(pool, driver_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
@@ -655,7 +643,7 @@ async fn buy_driver(
     }
 
     // Check if team already has 4 drivers
-    let driver_count = count_drivers_by_team(pool, team.id)
+    let driver_count = tdb::count_drivers_by_team(pool, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to count drivers: {}", e)))?;
 
@@ -666,13 +654,13 @@ async fn buy_driver(
     }
 
     // Assign driver to team
-    assign_driver_to_team(pool, driver_uuid, team.id)
+    tdb::assign_driver_to_team(pool, driver_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to assign driver: {}", e)))?;
 
     // Deduct cash from team
     let new_cash = team.cash - price;
-    let updated_team = update_team_cash(pool, team.id, new_cash)
+    let updated_team = tdb::update_team_cash(pool, team.id, new_cash)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to update team cash: {}", e)))?;
 
@@ -716,7 +704,7 @@ async fn buy_car(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Get the player's team
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
@@ -726,7 +714,7 @@ async fn buy_car(
         .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id)))?;
 
     // Get the car
-    let car = get_car_by_id(pool, car_uuid)
+    let car = tdb::get_car_by_id(pool, car_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id)))?;
@@ -758,7 +746,7 @@ async fn buy_car(
     }
 
     // Check if team already has 2 cars
-    let car_count = count_cars_by_team(pool, team.id)
+    let car_count = tdb::count_cars_by_team(pool, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to count cars: {}", e)))?;
 
@@ -769,13 +757,13 @@ async fn buy_car(
     }
 
     // Assign car to team
-    assign_car_to_team(pool, car_uuid, team.id)
+    tdb::assign_car_to_team(pool, car_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to assign car: {}", e)))?;
 
     // Deduct cash from team
     let new_cash = team.cash - price;
-    let updated_team = update_team_cash(pool, team.id, new_cash)
+    let updated_team = tdb::update_team_cash(pool, team.id, new_cash)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to update team cash: {}", e)))?;
 
@@ -825,7 +813,7 @@ async fn assign_driver_car(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Get the player's team
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
@@ -835,7 +823,7 @@ async fn assign_driver_car(
         .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
 
     // Get the driver
-    let driver = get_driver_by_id(pool, driver_uuid)
+    let driver = tdb::get_driver_by_id(pool, driver_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
@@ -853,7 +841,7 @@ async fn assign_driver_car(
             .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id_str)))?;
 
         // Verify car belongs to the team
-        let car = get_car_by_id(pool, uuid)
+        let car = tdb::get_car_by_id(pool, uuid)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
             .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id_str)))?;
@@ -871,7 +859,7 @@ async fn assign_driver_car(
 
     // If assigning to a car, check if another driver is already assigned to it
     if let Some(car_uuid_val) = car_uuid {
-        let drivers_with_car = list_drivers_by_team(pool, team.id)
+        let drivers_with_car = tdb::list_drivers_by_team(pool, team.id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
 
@@ -879,16 +867,18 @@ async fn assign_driver_car(
         for d in drivers_with_car {
             if d.id != driver_uuid && d.car_id == Some(car_uuid_val) {
                 // Unassign the other driver first
-                assign_driver_to_car(pool, d.id, None).await.map_err(|e| {
-                    ApiError::InternalError(format!("Failed to unassign driver: {}", e))
-                })?;
+                tdb::assign_driver_to_car(pool, d.id, None)
+                    .await
+                    .map_err(|e| {
+                        ApiError::InternalError(format!("Failed to unassign driver: {}", e))
+                    })?;
                 break;
             }
         }
     }
 
     // Assign/unassign driver to/from car
-    let updated_driver = assign_driver_to_car(pool, driver_uuid, car_uuid)
+    let updated_driver = tdb::assign_driver_to_car(pool, driver_uuid, car_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to assign driver to car: {}", e)))?;
 
@@ -913,7 +903,7 @@ async fn get_cars(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let cars = list_cars(pool)
+    let cars = tdb::list_cars(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch cars: {}", e)))?;
 
@@ -928,7 +918,7 @@ async fn get_unassigned_cars(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let cars = list_unassigned_cars(pool)
+    let cars = tdb::list_unassigned_cars(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned cars: {}", e)))?;
 
@@ -947,7 +937,7 @@ async fn get_car(
     let uuid = Uuid::parse_str(&car_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id)))?;
 
-    let car = get_car_by_id(pool, uuid)
+    let car = tdb::get_car_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id)))?;
@@ -967,7 +957,7 @@ async fn get_team_drivers(
     let uuid = Uuid::parse_str(&team_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
-    let drivers = list_drivers_by_team(pool, uuid)
+    let drivers = tdb::list_drivers_by_team(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team drivers: {}", e)))?;
 
@@ -993,7 +983,7 @@ async fn get_team_cars(
     let uuid = Uuid::parse_str(&team_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
-    let cars = list_cars_by_team(pool, uuid)
+    let cars = tdb::list_cars_by_team(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team cars: {}", e)))?;
 
@@ -1008,7 +998,7 @@ async fn get_tracks(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let tracks = list_tracks(pool)
+    let tracks = tdb::list_tracks(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch tracks: {}", e)))?;
 
@@ -1027,7 +1017,7 @@ async fn get_track(
     let uuid = Uuid::parse_str(&track_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid track ID format: {}", track_id)))?;
 
-    let track = get_track_by_id(pool, uuid)
+    let track = tdb::get_track_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch track: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Track with ID {} not found", track_id)))?;
@@ -1043,7 +1033,7 @@ async fn get_players(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let players = list_players(pool)
+    let players = tdb::list_players(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch players: {}", e)))?;
 
@@ -1062,7 +1052,7 @@ async fn get_player(
     let uuid = Uuid::parse_str(&player_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid player ID format: {}", player_id)))?;
 
-    let player = get_player_by_id(pool, uuid)
+    let player = tdb::get_player_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch player: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Player with ID {} not found", player_id)))?;
@@ -1078,7 +1068,7 @@ async fn get_races(
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let races = list_races(pool)
+    let races = tdb::list_races(pool)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch races: {}", e)))?;
 
@@ -1097,7 +1087,7 @@ async fn get_race(
     let uuid = Uuid::parse_str(&race_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
 
-    let race = get_race_by_id(pool, uuid)
+    let race = tdb::get_race_by_id(pool, uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
@@ -1139,7 +1129,7 @@ async fn create_race_handler(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Validate track exists
-    let _track = get_track_by_id(pool, request.track_id)
+    let _track = tdb::get_track_by_id(pool, request.track_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch track: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("Track not found".to_string()))?;
@@ -1162,7 +1152,7 @@ async fn create_race_handler(
     }
 
     // Create race
-    let race = create_race(pool, request, player_id)
+    let race = tdb::create_race(pool, request, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to create race: {}", e)))?;
 
@@ -1206,7 +1196,7 @@ async fn register_for_race(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Get the player's team
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
@@ -1216,7 +1206,7 @@ async fn register_for_race(
         .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
 
     // Verify race exists
-    let race = get_race_by_id(pool, race_uuid)
+    let race = tdb::get_race_by_id(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
@@ -1234,7 +1224,7 @@ async fn register_for_race(
         let now = Utc::now();
         if start_datetime < now {
             // Set race status as REGISTRATION_CLOSED
-            update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
+            tdb::update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
                 .await
                 .map_err(|e| {
                     ApiError::InternalError(format!(
@@ -1249,7 +1239,7 @@ async fn register_for_race(
     }
 
     // Check if already registered
-    let existing_registration = get_registration(pool, race_uuid, team.id)
+    let existing_registration = tdb::get_registration(pool, race_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
 
@@ -1260,7 +1250,7 @@ async fn register_for_race(
     }
 
     // Check current registration count
-    let current_count = count_registrations_by_race(pool, race_uuid)
+    let current_count = tdb::count_registrations_by_race(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to count registrations: {}", e)))?;
 
@@ -1273,14 +1263,14 @@ async fn register_for_race(
     }
 
     // Create registration
-    let registration = create_registration(pool, race_uuid, team.id)
+    let registration = tdb::create_registration(pool, race_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to register for race: {}", e)))?;
 
     // Check if we just reached MAX_PARTICIPANTS // 2 participants and close registration
     let new_count = current_count + 1;
     if new_count >= MAX_PARTICIPANTS {
-        update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
+        tdb::update_race_status(pool, race_uuid, "REGISTRATION_CLOSED")
             .await
             .map_err(|e| {
                 ApiError::InternalError(format!(
@@ -1330,7 +1320,7 @@ async fn unregister_from_race(
         player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
 
     // Get the player's team
-    let team = get_team_by_player(pool, player_id)
+    let team = tdb::get_team_by_player(pool, player_id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
@@ -1340,7 +1330,7 @@ async fn unregister_from_race(
         .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
 
     // Verify race exists
-    let race = get_race_by_id(pool, race_uuid)
+    let race = tdb::get_race_by_id(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
@@ -1355,7 +1345,7 @@ async fn unregister_from_race(
     }
 
     // Check if registered
-    let existing_registration = get_registration(pool, race_uuid, team.id)
+    let existing_registration = tdb::get_registration(pool, race_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
 
@@ -1366,12 +1356,12 @@ async fn unregister_from_race(
     }
 
     // Check current registration count
-    let current_count = count_registrations_by_race(pool, race_uuid)
+    let current_count = tdb::count_registrations_by_race(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to count registrations: {}", e)))?;
 
     // Delete registration
-    let deleted = delete_registration(pool, race_uuid, team.id)
+    let deleted = tdb::delete_registration(pool, race_uuid, team.id)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to unregister from race: {}", e)))?;
 
@@ -1384,7 +1374,7 @@ async fn unregister_from_race(
     // If race was closed (full at MAX_PARTICIPANTS) and now has less than MAX_PARTICIPANTS participants after deletion, reopen registration
     // current_count was the count before deletion, so after deletion it's current_count - 1
     if race.status == "REGISTRATION_CLOSED" && current_count == MAX_PARTICIPANTS {
-        update_race_status(pool, race_uuid, "REGISTRATION_OPEN")
+        tdb::update_race_status(pool, race_uuid, "REGISTRATION_OPEN")
             .await
             .map_err(|e| {
                 ApiError::InternalError(format!(
@@ -1415,7 +1405,7 @@ async fn get_race_registrations(
         .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
 
     // Verify race exists
-    let _race = get_race_by_id(pool, race_uuid)
+    let _race = tdb::get_race_by_id(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
@@ -1443,13 +1433,13 @@ async fn get_team_registrations(
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
     // Verify team exists
-    let _team = get_team_by_id(pool, team_uuid)
+    let _team = tdb::get_team_by_id(pool, team_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
         .ok_or_else(|| ApiError::NotFound(format!("Team with ID {} not found", team_id)))?;
 
     // Get registrations with race details
-    let registrations = list_registrations_with_race_details_by_team(pool, team_uuid)
+    let registrations = tdb::list_registrations_with_race_details_by_team(pool, team_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
 
@@ -1512,30 +1502,21 @@ async fn register(
         return Err(ApiError::BadRequest("Username already exists".to_string()));
     }
 
-    // Hash password
-    let password_hash = hash_password(&request.password)
-        .map_err(|e| ApiError::InternalError(format!("Failed to hash password: {}", e)))?;
-
     // Create player with password hash
-    let player = sqlx::query_as::<_, crate::database::PlayerDb>(
-        r#"
-        INSERT INTO player (username, email, password_hash)
-        VALUES ($1, $2, $3)
-        RETURNING *
-        "#,
-    )
-    .bind(&request.username)
-    .bind(&request.email)
-    .bind(&password_hash)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
-        if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
-            ApiError::BadRequest("Username already exists".to_string())
-        } else {
-            ApiError::InternalError(format!("Failed to create player: {}", e))
-        }
-    })?;
+    let create_request = CreatePlayerRequest {
+        username: request.username,
+        email: request.email,
+        password: request.password,
+    };
+    let player = tdb::create_player(pool, create_request)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+                ApiError::BadRequest("Username already exists".to_string())
+            } else {
+                ApiError::InternalError(format!("Failed to create player: {}", e))
+            }
+        })?;
 
     Ok(success(
         Some(player),
@@ -1654,7 +1635,7 @@ async fn start_race_now(
     }
 
     // Update race status to ONGOING and set start_datetime
-    start_race_in_db(pool, race_uuid)
+    tdb::start_race(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to start race: {:?}", e)))?;
 
@@ -1894,12 +1875,12 @@ async fn verify_car_ownership_and_registration(
 
     // If this is a scheduled race (has a race_id), verify the player's team is registered
     if let Some(race_id) = race_id {
-        let team = get_team_by_player(pool, player_id)
+        let team = tdb::get_team_by_player(pool, player_id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
             .ok_or_else(|| ApiError::Forbidden("You do not have a team".to_string()))?;
 
-        let registration = get_registration(pool, race_id, team.id)
+        let registration = tdb::get_registration(pool, race_id, team.id)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to check registration: {}", e)))?;
 

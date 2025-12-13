@@ -169,6 +169,30 @@ pub async fn update_team_cash(
     Ok(team)
 }
 
+pub async fn list_ai_teams_not_registered_for_race(
+    pool: &PgPool,
+    race_id: Uuid,
+    limit: i64,
+) -> Result<Vec<TeamDb>, sqlx::Error> {
+    let teams = sqlx::query_as::<_, TeamDb>(
+        r#"
+        SELECT * FROM team 
+        WHERE player_id IS NULL 
+        AND id NOT IN (
+            SELECT team_id FROM registration WHERE race_id = $1
+        )
+        ORDER BY number
+        LIMIT $2
+        "#,
+    )
+    .bind(race_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(teams)
+}
+
 // ========== Driver Queries ==========
 
 pub async fn create_driver(
@@ -579,7 +603,8 @@ pub async fn create_player(
     request: CreatePlayerRequest,
 ) -> Result<PlayerDb, sqlx::Error> {
     // Hash password
-    let password_hash = hash_password(&request.password).unwrap();
+    let password_hash = hash_password(&request.password)
+        .map_err(|e| sqlx::Error::Protocol(format!("Failed to hash password: {}", e).into()))?;
     let player = sqlx::query_as::<_, PlayerDb>(
         r#"
         INSERT INTO player (username, email, password_hash)
@@ -914,4 +939,67 @@ pub async fn finish_race(pool: &PgPool, race_id: Uuid) -> Result<RaceDb, sqlx::E
     .await?;
 
     Ok(race)
+}
+
+// ========== JWT Token Queries ==========
+
+pub async fn create_jwt_token(
+    pool: &PgPool,
+    player_id: Uuid,
+    token: &str,
+    expires_at: chrono::DateTime<chrono::Utc>,
+) -> Result<JwtTokenDb, sqlx::Error> {
+    let jwt_token = sqlx::query_as::<_, JwtTokenDb>(
+        r#"
+        INSERT INTO jwt_token (player_id, token, expires_at)
+        VALUES ($1, $2, $3)
+        RETURNING *
+        "#,
+    )
+    .bind(player_id)
+    .bind(token)
+    .bind(expires_at)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(jwt_token)
+}
+
+pub async fn get_jwt_token_by_token(
+    pool: &PgPool,
+    token: &str,
+) -> Result<Option<JwtTokenDb>, sqlx::Error> {
+    let jwt_token = sqlx::query_as::<_, JwtTokenDb>(
+        r#"
+        SELECT * FROM jwt_token
+        WHERE token = $1 AND expires_at > NOW()
+        "#,
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(jwt_token)
+}
+
+pub async fn delete_expired_jwt_tokens(pool: &PgPool) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM jwt_token
+        WHERE expires_at < NOW()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+pub async fn delete_jwt_token_by_token(pool: &PgPool, token: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM jwt_token WHERE token = $1")
+        .bind(token)
+        .execute(pool)
+        .await?;
+
+    Ok(result.rows_affected() > 0)
 }
