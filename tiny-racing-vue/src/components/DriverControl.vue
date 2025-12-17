@@ -14,8 +14,7 @@
 
       <div class="fuel-gauge-container">
         <div class="fuel-gauge-label">
-          Fuel
-          <span v-if="isPlayerCar" class="refuel-amount">(Refuel: {{ targetRefuelAmount }}%)</span>
+          #{{ car.car_number }} - {{ car.driver.name }} - P{{ car.race_position }}
         </div>
         <div
           class="fuel-gauge"
@@ -99,6 +98,49 @@
             </button>
           </div>
         </Teleport>
+      </div>
+
+      <div class="speed-gauge-container">
+        <div class="speed-gauge">
+          <svg class="speed-gauge-svg" viewBox="0 0 200 120">
+            <!-- Gradient definition -->
+            <defs>
+              <linearGradient
+                :id="`speedGradient-${car.car_number}`"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%"
+              >
+                <stop offset="0%" style="stop-color: #e84545; stop-opacity: 1" />
+                <stop offset="50%" style="stop-color: #f9a826; stop-opacity: 1" />
+                <stop offset="100%" style="stop-color: #7bc74d; stop-opacity: 1" />
+              </linearGradient>
+            </defs>
+            <!-- Semicircular arc -->
+            <path
+              :d="`M 20 100 A 80 80 0 0 1 180 100`"
+              fill="none"
+              :stroke="`url(#speedGradient-${car.car_number})`"
+              stroke-width="20"
+              stroke-linecap="round"
+            />
+            <!-- Speed indicator dot -->
+            <circle
+              class="speed-indicator"
+              :cx="getSpeedIndicatorX()"
+              :cy="getSpeedIndicatorY()"
+              r="12"
+              fill="#2d4059"
+              stroke="#141c27"
+              stroke-width="1"
+            />
+          </svg>
+          <div class="speed-value">
+            <div class="speed-number">{{ Math.round(car.speed) }}</div>
+            <div class="speed-unit">Km/h</div>
+          </div>
+        </div>
       </div>
 
       <div class="pit-info" v-if="isPlayerCar">
@@ -247,6 +289,24 @@ function getFuelColorClass(fuel: number): string {
   if (fuel > 50) return 'fuel-high';
   if (fuel > 25) return 'fuel-medium';
   return 'fuel-low';
+}
+
+// Calculate speed indicator position on the gauge (0-400 km/h mapped to semicircle)
+// Semicircle goes from left (0 km/h, angle π) to right (400 km/h, angle 0)
+function getSpeedIndicatorX(): number {
+  const speed = Math.max(0, Math.min(400, props.car.speed));
+  const angle = Math.PI - (speed / 400) * Math.PI; // π (left) to 0 (right)
+  const centerX = 100;
+  const radius = 80;
+  return centerX + radius * Math.cos(angle);
+}
+
+function getSpeedIndicatorY(): number {
+  const speed = Math.max(0, Math.min(400, props.car.speed));
+  const angle = Math.PI - (speed / 400) * Math.PI; // π (left) to 0 (right)
+  const centerY = 100;
+  const radius = 80;
+  return centerY - radius * Math.sin(angle);
 }
 
 async function cycleDrivingStyle() {
@@ -636,6 +696,7 @@ watch(showTireSelector, (isOpen) => {
 
 .pit-btn.cancel-btn {
   background-color: #e84545;
+  padding: 12px 4px;
 }
 
 .pit-btn.cancel-btn:hover:not(:disabled) {
@@ -685,5 +746,56 @@ watch(showTireSelector, (isOpen) => {
 .pit-tire-icon {
   width: 14px;
   height: 14px;
+}
+
+.speed-gauge-container {
+  position: relative;
+  width: 80px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.speed-gauge {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speed-gauge-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.speed-indicator {
+  transition:
+    cx 0.3s ease,
+    cy 0.3s ease;
+}
+
+.speed-value {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  pointer-events: none;
+  margin-top: 20px;
+}
+
+.speed-number {
+  font-size: 0.9em;
+  font-weight: bold;
+  color: #2d4059;
+  line-height: 1;
+}
+
+.speed-unit {
+  font-size: 0.5em;
+  color: #2d4059;
+  margin-top: 1px;
 }
 </style>

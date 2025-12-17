@@ -138,6 +138,7 @@ const playerCars = computed(() => {
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
+  max-width: 375px;
 }
 
 .track-content {
