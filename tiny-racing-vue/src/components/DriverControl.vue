@@ -2,14 +2,22 @@
   <div class="driver-control" :class="{ 'player-car': isPlayerCar }">
     <!-- First Row: Avatar, Fuel Gauge, Driving Style -->
     <div class="control-row first-row">
-      <div class="driver-avatar-container">
-        <img
-          v-if="driverAvatarUrl"
-          :src="driverAvatarUrl"
-          :alt="car.driver.name"
-          class="driver-avatar"
-        />
-        <div v-else class="driver-avatar-placeholder">{{ getInitials(car.driver.name) }}</div>
+      <div class="driver-avatar-section">
+        <div class="driver-avatar-container">
+          <div
+            v-if="car.driver.stress_level !== undefined"
+            class="stress-level-overlay"
+            :style="{ height: `${(car.driver.stress_level || 0) * 100}%` }"
+            :class="getStressColorClass(car.driver.stress_level || 0)"
+          ></div>
+          <img
+            v-if="driverAvatarUrl"
+            :src="driverAvatarUrl"
+            :alt="car.driver.name"
+            class="driver-avatar"
+          />
+          <div v-else class="driver-avatar-placeholder">{{ getInitials(car.driver.name) }}</div>
+        </div>
       </div>
 
       <div class="fuel-gauge-container">
@@ -291,6 +299,12 @@ function getFuelColorClass(fuel: number): string {
   return 'fuel-low';
 }
 
+function getStressColorClass(stress: number): string {
+  if (stress > 0.7) return 'stress-high';
+  if (stress > 0.4) return 'stress-medium';
+  return 'stress-low';
+}
+
 // Calculate speed indicator position on the gauge (0-400 km/h mapped to semicircle)
 // Semicircle goes from left (0 km/h, angle π) to right (400 km/h, angle 0)
 function getSpeedIndicatorX(): number {
@@ -436,34 +450,67 @@ watch(showTireSelector, (isOpen) => {
   margin-bottom: 0;
 }
 
-.driver-avatar-container {
-  width: 48px;
-  height: 48px;
+.driver-avatar-section {
+  position: relative;
   flex-shrink: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  background-color: #dbe2ef;
+}
+
+.driver-avatar-container {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 2px solid #c9d6df;
+  border-radius: 4px;
+  background-color: #f9f7f7;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #c9d6df;
+  overflow: hidden;
+}
+
+.stress-level-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transition: height 0.3s ease, background-color 0.3s ease;
+  pointer-events: none;
+}
+
+.stress-level-overlay.stress-low {
+  background-color: rgba(123, 199, 77, 0.3); /* Green for low stress */
+}
+
+.stress-level-overlay.stress-medium {
+  background-color: rgba(249, 168, 38, 0.3); /* Orange for medium stress */
+}
+
+.stress-level-overlay.stress-high {
+  background-color: rgba(232, 69, 69, 0.3); /* Red for high stress */
 }
 
 .driver-avatar {
-  width: 100%;
-  height: 100%;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
 }
 
 .driver-avatar-placeholder {
-  width: 100%;
-  height: 100%;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   color: #2d4059;
   font-size: 0.9em;
+  border-radius: 50%;
+  background-color: #dbe2ef;
+  position: relative;
+  z-index: 1;
 }
 
 .fuel-gauge-container {

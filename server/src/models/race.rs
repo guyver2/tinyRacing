@@ -332,6 +332,7 @@ impl RaceState {
                 experience: driver_db.experience,
                 consistency: driver_db.consistency,
                 focus: driver_db.focus,
+                stress_level: 0.0, // Initialize stress level to 0 at race start
             };
 
             // Convert CarDb stats to CarStats
@@ -886,6 +887,28 @@ impl RaceState {
                 tire_wear_rate * tire_type_wear_multiplier * self.tick_duration_seconds as f32;
             car.tire.wear = car.tire.wear.min(100.0); // Cap at 100%?
                                                       // TODO: Consider tire failure above certain wear
+
+            // Update driver stress level based on time and driving style
+            // Base stress increase from race time (increases over time)
+            let stress_change = match car.driving_style {
+                DrivingStyle::Aggressive => {
+                    // Aggressive driving increases stress faster
+                    0.03 * (1.0 - car.driver.focus) * self.tick_duration_seconds
+                }
+                DrivingStyle::Normal => {
+                    // Normal driving: stress increases slowly, but can decrease slightly
+                    // Net effect: slow decrease (stress increase - small decrease)
+                    -0.005 * car.driver.focus * self.tick_duration_seconds
+                }
+                DrivingStyle::Relax => {
+                    // Relaxed driving: stress decreases faster
+                    // Net effect: faster decrease (stress increase - larger decrease)
+                    -0.015 * car.driver.focus * self.tick_duration_seconds
+                }
+            };
+            car.driver.stress_level += stress_change;
+            // Clamp stress level between 0.0 and 1.0
+            car.driver.stress_level = car.driver.stress_level.clamp(0.0, 1.0);
 
             // Store total distance for position calculation
             if car.status == CarStatus::Racing || car.status == CarStatus::Pit {

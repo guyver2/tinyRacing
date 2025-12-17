@@ -19,6 +19,7 @@ export interface Driver {
   experience: number;
   consistency: number;
   focus: number;
+  stress_level: number;
 }
 
 export interface Car {

@@ -20,7 +20,8 @@
                 "weather_tolerance": 0.90,
                 "experience": 0.88,
                 "consistency": 0.93,
-                "focus": 0.94
+                "focus": 0.94,
+                "stress_level": 0.0
              },
             "driver_2": {
                 "name": "Yuki Tsunoda", 
@@ -29,7 +30,8 @@
                 "weather_tolerance": 0.80,
                 "experience": 0.75,
                 "consistency": 0.78,
-                "focus": 0.83
+                "focus": 0.83,
+                "stress_level": 0.0
             },
             "car_1":{
                 "handling": 0.8,
@@ -64,7 +66,8 @@
                 "weather_tolerance": 0.85,
                 "experience": 0.86,
                 "consistency": 0.84,
-                "focus": 0.90
+                "focus": 0.90,
+                "stress_level": 0.0
              },
             "driver_2": {
                 "name": "Lewis Hamilton",
@@ -73,7 +76,8 @@
                 "weather_tolerance": 0.92,
                 "experience": 0.95,
                 "consistency": 0.91,
-                "focus": 0.93
+                "focus": 0.93,
+                "stress_level": 0.0
             },
             "car_1":{
                 "handling": 0.7,
@@ -108,7 +112,8 @@
                 "weather_tolerance": 0.84,
                 "experience": 0.82,
                 "consistency": 0.85,
-                "focus": 0.88
+                "focus": 0.88,
+                "stress_level": 0.0
              },
             "driver_2": {
                 "name": "Kimi Antonelli",
@@ -117,7 +122,8 @@
                 "weather_tolerance": 0.72,
                 "experience": 0.65,
                 "consistency": 0.70,
-                "focus": 0.80
+                "focus": 0.80,
+                "stress_level": 0.0
             },
             "car_1":{
                 "handling": 0.65,
@@ -152,7 +158,8 @@
                 "weather_tolerance": 0.85,
                 "experience": 0.84,
                 "consistency": 0.87,
-                "focus": 0.89
+                "focus": 0.89,
+                "stress_level": 0.0
              },
             "driver_2": {
                 "name": "Oscar Piastri",
@@ -161,7 +168,8 @@
                 "weather_tolerance": 0.80,
                 "experience": 0.75,
                 "consistency": 0.82,
-                "focus": 0.86
+                "focus": 0.86,
+                "stress_level": 0.0
             },
             "car_1":{
                 "handling": 0.85,
@@ -196,7 +204,8 @@
                 "weather_tolerance": 0.83,
                 "experience": 0.84,
                 "consistency": 0.82,
-                "focus": 0.85
+                "focus": 0.85,
+                "stress_level": 0.0
              },
             "driver_2": {
                 "name": "Isack Hadjar",
@@ -205,7 +214,8 @@
                 "weather_tolerance": 0.75,
                 "experience": 0.70,
                 "consistency": 0.73,
-                "focus": 0.78
+                "focus": 0.78,
+                "stress_level": 0.0
             },
             "car_1":{
                 "handling": 0.65,
