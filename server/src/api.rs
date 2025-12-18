@@ -9,12 +9,15 @@ use crate::models::car::CarStatus;
 use crate::models::driver_avatar::generate_driver_avatar;
 use crate::models::race::{RaceRunState, RaceState, MAX_PARTICIPANTS};
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
 };
+use multer::Multipart;
+use futures_util::stream;
 use chrono::Utc;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
@@ -25,6 +28,7 @@ use std::sync::{Arc, Mutex};
 use tokio::fs;
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use uuid::Uuid;
 
 // Type alias for the shared state used across threads/tasks
@@ -320,6 +324,8 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
             "/race/{race_id}/car/{car_number}/pit",
             post(request_pit_stop),
         )
+        // Static file serving for assets
+        .nest_service("/assets", ServeDir::new("assets"))
         // Apply CORS middleware
         .layer(cors)
         // Share state across handlers
@@ -431,7 +437,7 @@ async fn get_my_team(
 async fn create_team_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(request): Json<CreateTeamRequest>,
+    body: Bytes,
 ) -> ApiResult<Json<ApiResponse<crate::database::TeamDb>>> {
     let pool = state
         .db_pool
@@ -457,13 +463,125 @@ async fn create_team_handler(
         None
     };
 
+    // Get content type from headers
+    let content_type = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    // Extract boundary from content-type
+    let boundary = content_type
+        .split("boundary=")
+        .nth(1)
+        .ok_or_else(|| ApiError::BadRequest("Missing boundary in content-type".to_string()))?;
+
+    // Convert Bytes to a stream for multer by chunking into 8KB pieces
+    const CHUNK_SIZE: usize = 8192;
+    let chunks: Vec<Result<Bytes, multer::Error>> = body
+        .chunks(CHUNK_SIZE)
+        .map(|chunk| Ok(Bytes::from(chunk.to_vec())))
+        .collect();
+    let body_stream = stream::iter(chunks);
+    let mut multipart = Multipart::new(body_stream, boundary);
+
+    let mut name: Option<String> = None;
+    let mut color: Option<String> = None;
+    let mut number: Option<i32> = None;
+    let mut pit_efficiency: Option<f32> = None;
+    let mut logo_path: Option<String> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        ApiError::BadRequest(format!("Failed to parse multipart form: {}", e))
+    })? {
+        let field_name = field.name().unwrap_or("").to_string();
+        
+        match field_name.as_str() {
+            "name" => {
+                if let Ok(value) = field.text().await {
+                    name = Some(value);
+                }
+            }
+            "color" => {
+                if let Ok(value) = field.text().await {
+                    color = Some(value);
+                }
+            }
+            "number" => {
+                if let Ok(value) = field.text().await {
+                    if let Ok(num) = value.parse::<i32>() {
+                        number = Some(num);
+                    }
+                }
+            }
+            "pit_efficiency" => {
+                if let Ok(value) = field.text().await {
+                    if let Ok(eff) = value.parse::<f32>() {
+                        pit_efficiency = Some(eff);
+                    }
+                }
+            }
+            "logo" => {
+                // Check if this is a file field
+                let content_type_opt = field.content_type().map(|s| s.to_string());
+                if let Some(ref content_type) = content_type_opt {
+                    if content_type.starts_with("image/") {
+                        // Validate file size (1MB = 1048576 bytes)
+                        const MAX_FILE_SIZE: usize = 1048576;
+                        let mut file_data = Vec::new();
+                        let mut field_mut = field;
+                        while let Ok(Some(chunk)) = field_mut.chunk().await {
+                            file_data.extend_from_slice(&chunk);
+                            if file_data.len() > MAX_FILE_SIZE {
+                                return Err(ApiError::BadRequest(
+                                    "Logo file size exceeds 1MB limit".to_string(),
+                                ));
+                            }
+                        }
+
+                        // Validate file type
+                        let is_jpeg = content_type == "image/jpeg" || content_type == "image/jpg";
+                        let is_png = content_type == "image/png";
+                        
+                        if !is_jpeg && !is_png {
+                            return Err(ApiError::BadRequest(
+                                "Logo must be a JPG or PNG image".to_string(),
+                            ));
+                        }
+
+                        // Determine file extension
+                        let extension = if is_jpeg { "jpg" } else { "png" };
+
+                        // Generate unique filename
+                        let filename = format!("team_{}.{}", Uuid::new_v4(), extension);
+                        let avatar_dir = StdPath::new("assets/avatars/teams");
+                        let file_path = avatar_dir.join(&filename);
+
+                        // Ensure directory exists
+                        fs::create_dir_all(avatar_dir).await.map_err(|e| {
+                            ApiError::InternalError(format!("Failed to create avatar directory: {}", e))
+                        })?;
+
+                        // Write the file
+                        fs::write(&file_path, file_data).await.map_err(|e| {
+                            ApiError::InternalError(format!("Failed to save logo file: {}", e))
+                        })?;
+
+                        // Store the path relative to assets root for serving
+                        logo_path = Some(format!("assets/avatars/teams/{}", filename));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Validate required fields
+    let team_name = name.ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let team_color = color.ok_or_else(|| ApiError::BadRequest("color is required".to_string()))?;
+
     // Set player_id from token if not provided in request
-    let mut team_request = request;
-    let final_player_id = if team_request.player_id.is_some() {
-        team_request.player_id
-    } else {
-        player_id
-    };
+    let final_player_id = player_id;
 
     // Check if player already has a team
     if let Some(pid) = final_player_id {
@@ -476,23 +594,31 @@ async fn create_team_handler(
                 "You already have a team. Each player can only manage one team.".to_string(),
             ));
         }
-
-        team_request.player_id = Some(pid);
     }
 
     // Check if team number already exists (only if number is provided)
-    if let Some(number) = team_request.number {
-        let existing_team = crate::database::get_team_by_number(pool, number)
+    if let Some(num) = number {
+        let existing_team = crate::database::get_team_by_number(pool, num)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to check team number: {}", e)))?;
 
         if existing_team.is_some() {
             return Err(ApiError::BadRequest(format!(
                 "Team number {} already exists",
-                number
+                num
             )));
         }
     }
+
+    // Create team request
+    let team_request = CreateTeamRequest {
+        number,
+        name: team_name,
+        logo: logo_path, // Will be converted to empty string in query if None
+        color: team_color,
+        pit_efficiency,
+        player_id: final_player_id,
+    };
 
     let team = tdb::create_team(pool, team_request)
         .await

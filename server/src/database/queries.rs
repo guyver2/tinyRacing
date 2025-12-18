@@ -32,6 +32,9 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
     // Default cash value for new teams is 500
     let cash = 500;
 
+    // Use empty string if logo is not provided
+    let logo = request.logo.unwrap_or_default();
+
     let team = sqlx::query_as::<_, TeamDb>(
         // this query check against the database schema for the correct types at compile time query_as!
         r#"
@@ -42,7 +45,7 @@ pub async fn create_team(pool: &PgPool, request: CreateTeamRequest) -> Result<Te
     )
     .bind(team_number)
     .bind(request.name)
-    .bind(request.logo)
+    .bind(logo)
     .bind(request.color)
     .bind(pit_efficiency)
     .bind(cash)

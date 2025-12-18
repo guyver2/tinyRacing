@@ -23,11 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let team = create_team(
         db.pool(),
         CreateTeamRequest {
-            number: 1,
+            number: Some(1),
             name: "Red Bull Racing".to_string(),
-            logo: "redbull.svg".to_string(),
+            logo: Some("redbull.svg".to_string()),
             color: "#1E41FF".to_string(),
-            pit_efficiency: 0.95,
+            pit_efficiency: Some(0.95),
         },
     )
     .await?;

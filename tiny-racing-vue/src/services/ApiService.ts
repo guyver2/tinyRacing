@@ -203,7 +203,7 @@ export interface TeamDb {
 export interface CreateTeamRequest {
   number?: number;
   name: string;
-  logo: string;
+  logo?: string; // Optional, can be provided as file upload
   color: string;
   pit_efficiency?: number;
   player_id?: string | null;
@@ -252,10 +252,38 @@ export async function getMyTeam(): Promise<TeamDb | null> {
 }
 
 // Create a new team
-export async function createTeam(request: CreateTeamRequest): Promise<TeamDb> {
-  const response = await apiRequest('/teams', {
+export async function createTeam(
+  request: CreateTeamRequest,
+  logoFile?: File | null,
+): Promise<TeamDb> {
+  // Create FormData for multipart form submission
+  const formData = new FormData();
+  formData.append('name', request.name);
+  formData.append('color', request.color);
+  
+  if (request.number !== undefined) {
+    formData.append('number', request.number.toString());
+  }
+  
+  if (request.pit_efficiency !== undefined) {
+    formData.append('pit_efficiency', request.pit_efficiency.toString());
+  }
+  
+  // Add logo file if provided
+  if (logoFile) {
+    formData.append('logo', logoFile);
+  }
+
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/teams`, {
     method: 'POST',
-    body: JSON.stringify(request),
+    headers,
+    body: formData,
   });
 
   if (!response.ok) {

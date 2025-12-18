@@ -26,14 +26,27 @@
               />
             </div>
             <div class="form-group">
-              <label for="teamLogo">Logo URL:</label>
+              <label for="teamLogo">Team Logo (JPG/PNG, max 1MB):</label>
               <input
                 id="teamLogo"
-                v-model="formData.logo"
-                type="text"
-                placeholder="https://example.com/logo.png"
+                ref="logoFileInput"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                @change="handleLogoFileChange"
                 :disabled="creating"
               />
+              <div v-if="logoPreview" class="logo-preview">
+                <img :src="logoPreview" alt="Logo preview" />
+                <button
+                  type="button"
+                  @click="clearLogoPreview"
+                  class="clear-logo-btn"
+                  :disabled="creating"
+                >
+                  Remove
+                </button>
+              </div>
+              <p v-if="logoError" class="logo-error">{{ logoError }}</p>
             </div>
             <div class="form-group">
               <label for="teamColor">Color:</label>
@@ -330,9 +343,13 @@ const unregisteringRaceId = ref<string | null>(null);
 
 const formData = ref<CreateTeamRequest>({
   name: '',
-  logo: '',
   color: '#2d4059',
 });
+
+const logoFileInput = ref<HTMLInputElement | null>(null);
+const logoFile = ref<File | null>(null);
+const logoPreview = ref<string | null>(null);
+const logoError = ref<string>('');
 
 // Sort cars by number
 const sortedCars = computed(() => {
@@ -503,8 +520,59 @@ async function loadLineup(teamId: string) {
   }
 }
 
+function handleLogoFileChange(event: Event) {
+  logoError.value = '';
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) {
+    logoFile.value = null;
+    logoPreview.value = null;
+    return;
+  }
+
+  // Validate file type
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  if (!validTypes.includes(file.type)) {
+    logoError.value = 'Please select a JPG or PNG image file';
+    target.value = '';
+    logoFile.value = null;
+    logoPreview.value = null;
+    return;
+  }
+
+  // Validate file size (1MB = 1048576 bytes)
+  const maxSize = 1048576;
+  if (file.size > maxSize) {
+    logoError.value = 'File size must be less than 1MB';
+    target.value = '';
+    logoFile.value = null;
+    logoPreview.value = null;
+    return;
+  }
+
+  logoFile.value = file;
+
+  // Create preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    logoPreview.value = e.target?.result as string;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLogoPreview() {
+  if (logoFileInput.value) {
+    logoFileInput.value.value = '';
+  }
+  logoFile.value = null;
+  logoPreview.value = null;
+  logoError.value = '';
+}
+
 async function handleCreateTeam() {
   createError.value = '';
+  logoError.value = '';
   creating.value = true;
 
   try {
@@ -512,14 +580,14 @@ async function handleCreateTeam() {
       ...formData.value,
     };
 
-    await createTeam(request);
+    await createTeam(request, logoFile.value);
 
     // Reset form
     formData.value = {
       name: '',
-      logo: '',
       color: '#2d4059',
     };
+    clearLogoPreview();
 
     // Reload team
     await loadTeam();
@@ -636,13 +704,18 @@ label {
 
 input[type='text'],
 input[type='number'],
-input[type='color'] {
+input[type='color'],
+input[type='file'] {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
   box-sizing: border-box;
+}
+
+input[type='file'] {
+  cursor: pointer;
 }
 
 input[type='color'] {
@@ -759,6 +832,49 @@ button:disabled {
   max-width: 100%;
   max-height: 100px;
   object-fit: contain;
+}
+
+.logo-preview {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo-preview img {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+.clear-logo-btn {
+  padding: 0.5rem 1rem;
+  background-color: #f57c00;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.clear-logo-btn:hover:not(:disabled) {
+  background-color: #e65100;
+}
+
+.clear-logo-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.logo-error {
+  color: #d32f2f;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
 }
 
 .upcoming-races-section {

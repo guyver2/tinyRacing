@@ -98,7 +98,8 @@ pub struct CreateTeamRequest {
     #[serde(default)]
     pub number: Option<i32>,
     pub name: String,
-    pub logo: String,
+    #[serde(default)]
+    pub logo: Option<String>, // Optional, can be set from file upload
     pub color: String,
     #[serde(default)]
     pub pit_efficiency: Option<f32>,

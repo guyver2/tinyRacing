@@ -752,7 +752,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 number: Some(team_data.number),
                 player_id: None,
                 name: team_data.name.to_string(),
-                logo: team_data.logo.to_string(),
+                logo: Some(team_data.logo.to_string()),
                 color: team_data.color.to_string(),
                 pit_efficiency: Some(team_data.pit_efficiency),
             },

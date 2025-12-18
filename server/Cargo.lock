@@ -2350,6 +2350,7 @@ dependencies = [
  "headers 0.4.1",
  "hyper 1.6.0",
  "jsonwebtoken",
+ "multer 3.1.0",
  "ncurses",
  "pancurses",
  "rand 0.9.1",
