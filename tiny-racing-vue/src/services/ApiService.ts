@@ -260,15 +260,15 @@ export async function createTeam(
   const formData = new FormData();
   formData.append('name', request.name);
   formData.append('color', request.color);
-  
+
   if (request.number !== undefined) {
     formData.append('number', request.number.toString());
   }
-  
+
   if (request.pit_efficiency !== undefined) {
     formData.append('pit_efficiency', request.pit_efficiency.toString());
   }
-  
+
   // Add logo file if provided
   if (logoFile) {
     formData.append('logo', logoFile);

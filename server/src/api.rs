@@ -16,9 +16,9 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use multer::Multipart;
-use futures_util::stream;
 use chrono::Utc;
+use futures_util::stream;
+use multer::Multipart;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
 use std::collections::hash_map::DefaultHasher;
@@ -491,11 +491,13 @@ async fn create_team_handler(
     let mut pit_efficiency: Option<f32> = None;
     let mut logo_path: Option<String> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        ApiError::BadRequest(format!("Failed to parse multipart form: {}", e))
-    })? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to parse multipart form: {}", e)))?
+    {
         let field_name = field.name().unwrap_or("").to_string();
-        
+
         match field_name.as_str() {
             "name" => {
                 if let Ok(value) = field.text().await {
@@ -542,7 +544,7 @@ async fn create_team_handler(
                         // Validate file type
                         let is_jpeg = content_type == "image/jpeg" || content_type == "image/jpg";
                         let is_png = content_type == "image/png";
-                        
+
                         if !is_jpeg && !is_png {
                             return Err(ApiError::BadRequest(
                                 "Logo must be a JPG or PNG image".to_string(),
@@ -559,7 +561,10 @@ async fn create_team_handler(
 
                         // Ensure directory exists
                         fs::create_dir_all(avatar_dir).await.map_err(|e| {
-                            ApiError::InternalError(format!("Failed to create avatar directory: {}", e))
+                            ApiError::InternalError(format!(
+                                "Failed to create avatar directory: {}",
+                                e
+                            ))
                         })?;
 
                         // Write the file

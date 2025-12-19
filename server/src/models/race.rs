@@ -16,7 +16,7 @@ use std::io::{self};
 use uuid::Uuid;
 
 pub const MAX_PARTICIPANTS: i64 = 5;
-const AUTO_RACE_RESTART: bool = true;
+const AUTO_RACE_RESTART: bool = false;
 
 /// Check if auto race restart is enabled via environment variable
 pub fn is_auto_race_restart_enabled() -> bool {
@@ -170,6 +170,33 @@ pub fn create_event(
 }
 
 impl RaceState {
+    /// Create an empty race state (no race loaded)
+    /// This is used when the server starts without a pre-loaded race.
+    /// Races should be started from scheduled race items via the API.
+    pub fn empty() -> Self {
+        use crate::models::weather::Weather;
+        Self {
+            track: Track {
+                uid: None,
+                id: "".to_string(),
+                name: "No race loaded".to_string(),
+                laps: 0,
+                lap_length_km: 0.0,
+                sampled_track: Vec::new(),
+                weather: Weather {
+                    state_change_time: vec![(0.0, 0.0)],
+                },
+                wetness: 0.0,
+            },
+            cars: HashMap::new(),
+            run_state: RaceRunState::Paused,
+            tick_count: 0,
+            tick_duration_seconds: 0.1,
+            events: Vec::new(),
+            race_id: None,
+        }
+    }
+
     /// Register a new event in the race state
     pub fn register_event(
         &mut self,

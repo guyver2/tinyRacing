@@ -473,7 +473,9 @@ watch(showTireSelector, (isOpen) => {
   bottom: 0;
   left: 0;
   right: 0;
-  transition: height 0.3s ease, background-color 0.3s ease;
+  transition:
+    height 0.3s ease,
+    background-color 0.3s ease;
   pointer-events: none;
 }
 

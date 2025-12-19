@@ -76,7 +76,7 @@ onMounted(() => {
     <main class="main-content" :class="{ 'no-overflow': currentView === 'game' }">
       <!-- Game view -->
       <div v-show="currentView === 'game'" class="view">
-        <Game />
+        <Game @navigate="handleNavigate" />
       </div>
 
       <!-- Team view -->

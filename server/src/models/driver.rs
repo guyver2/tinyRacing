@@ -17,7 +17,7 @@ pub struct Driver {
     pub weather_tolerance: f32, // how well the driver can handle the wet weather
     pub experience: f32, // how experienced the driver is, more experience means less mistakes
     pub consistency: f32, // how consistent the driver is, less variance in performance
-    pub focus: f32,   // how focused the driver is, how much they are susceptible to be in the zone and how much they resist and recover from stress
+    pub focus: f32, // how focused the driver is, how much they are susceptible to be in the zone and how much they resist and recover from stress
     pub stress_level: f32, // how stressed the driver is (0.0 to 1.0). Increases with time when aggressive, decreases slowly when normal, decreases faster when relaxed
 }
 

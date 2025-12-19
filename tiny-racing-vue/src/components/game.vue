@@ -10,11 +10,24 @@ import { useRaceData } from '../services/WebSocketService';
 import { getPlayerId, isAuthenticated } from '../services/ApiService';
 import type { Car } from '@/types';
 
+const emit = defineEmits<{
+  navigate: [view: string];
+}>();
+
 const { raceState, connected } = useRaceData();
 const isCarTableCollapsed = ref(true);
 
 // Get current player ID
 const currentPlayerId = computed(() => getPlayerId());
+
+// Check if there's no active race
+const hasNoRace = computed(() => {
+  return (
+    !raceState.value.track.id ||
+    raceState.value.track.name === 'No race loaded' ||
+    raceState.value.cars.length === 0
+  );
+});
 
 // Filter cars to only show player's cars, ordered by car number
 const playerCars = computed(() => {
@@ -25,42 +38,61 @@ const playerCars = computed(() => {
     .filter((car: Car) => car.player_uuid === currentPlayerId.value)
     .sort((a: Car, b: Car) => a.car_number - b.car_number);
 });
+
+function navigateToRaces() {
+  emit('navigate', 'races');
+}
 </script>
 
 <template>
   <div class="app-container">
-    <div class="main-content">
-      <div class="header-content">
-        <RaceHeader
-          :trackName="raceState.track.name"
-          :elapsedTime="raceState.track.elapsed_time"
-          :raceStatus="raceState.race_status"
-          :currentLap="raceState.current_lap"
-          :totalLaps="raceState.total_laps"
-          :weather="raceState.track.current_weather"
-          :wetness="raceState.track.wetness"
-        />
+    <!-- No race state -->
+    <div v-if="hasNoRace" class="no-race-container">
+      <div class="no-race-message">
+        <h2>No Active Race</h2>
+        <p>There is currently no active race. Start a race from the races page to begin racing.</p>
+        <button @click="navigateToRaces" class="btn-primary">Go to Races</button>
       </div>
-      <div class="game-content">
-        <div class="sidebar" :class="{ expanded: !isCarTableCollapsed }">
-          <div class="cars-table-container">
-            <CarsTable :cars="raceState.cars" v-model:collapsed="isCarTableCollapsed" />
-          </div>
-          <div v-if="playerCars.length > 0" class="driver-controls-container">
-            <DriverControl v-for="car in playerCars" :key="car.car_number" :car="car" />
-          </div>
-        </div>
-
-        <div class="track-content">
-          <TrackSvg :cars="raceState.cars" :trackId="raceState.track.id" />
-        </div>
+      <div class="footer-content">
+        <ConnectionStatus :connected="connected" />
       </div>
     </div>
 
-    <div class="footer-content">
-      <TrackVisualizer :cars="raceState.cars" />
-      <ConnectionStatus :connected="connected" />
-    </div>
+    <!-- Active race state -->
+    <template v-else>
+      <div class="main-content">
+        <div class="header-content">
+          <RaceHeader
+            :trackName="raceState.track.name"
+            :elapsedTime="raceState.track.elapsed_time"
+            :raceStatus="raceState.race_status"
+            :currentLap="raceState.current_lap"
+            :totalLaps="raceState.total_laps"
+            :weather="raceState.track.current_weather"
+            :wetness="raceState.track.wetness"
+          />
+        </div>
+        <div class="game-content">
+          <div class="sidebar" :class="{ expanded: !isCarTableCollapsed }">
+            <div class="cars-table-container">
+              <CarsTable :cars="raceState.cars" v-model:collapsed="isCarTableCollapsed" />
+            </div>
+            <div v-if="playerCars.length > 0" class="driver-controls-container">
+              <DriverControl v-for="car in playerCars" :key="car.car_number" :car="car" />
+            </div>
+          </div>
+
+          <div class="track-content">
+            <TrackSvg :cars="raceState.cars" :trackId="raceState.track.id" />
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-content">
+        <TrackVisualizer :cars="raceState.cars" />
+        <ConnectionStatus :connected="connected" />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -171,6 +203,59 @@ const playerCars = computed(() => {
   flex-direction: column;
   margin-top: 15px;
   margin-bottom: 15px;
+}
+
+.no-race-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  padding: 2rem;
+}
+
+.no-race-message {
+  text-align: center;
+  max-width: 600px;
+  padding: 3rem;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.no-race-message h2 {
+  color: #1a1a2e;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.no-race-message p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.btn-primary {
+  background-color: #5c7aea;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #4a6fd8;
+}
+
+.btn-primary:active {
+  background-color: #3d5bc4;
 }
 
 /* Pastel Tire Colors */
