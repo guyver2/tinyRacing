@@ -1756,9 +1756,13 @@ async fn start_race_now(
         .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
 
     // Load the race from the database
-    let new_race_state = crate::models::race::RaceState::load_scheduled_race(pool, race_uuid)
+    let mut new_race_state = crate::models::race::RaceState::load_scheduled_race(pool, race_uuid)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to load race: {}", e)))?;
+
+    // Set the database pool for saving events
+    use std::sync::Arc;
+    new_race_state.set_db_pool(Arc::new(pool.clone()));
 
     // Replace the current race state
     {

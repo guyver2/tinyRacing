@@ -38,7 +38,7 @@ impl CarStats {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Car {
-    pub uid: Option<Uuid>,
+    pub uid: Uuid,
     pub number: u32,
     pub team: Team,
     pub driver: Driver,

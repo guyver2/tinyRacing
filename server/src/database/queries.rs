@@ -944,6 +944,98 @@ pub async fn finish_race(pool: &PgPool, race_id: Uuid) -> Result<RaceDb, sqlx::E
     Ok(race)
 }
 
+// ========== Event Queries ==========
+
+pub async fn create_event(
+    pool: &PgPool,
+    request: CreateEventRequest,
+) -> Result<EventDb, sqlx::Error> {
+    let event = sqlx::query_as::<_, EventDb>(
+        r#"
+        INSERT INTO event (
+            race_id, event_type, description, time_offset_seconds,
+            car_number, car_id, team_id, driver_id, tire, fuel
+        )
+        VALUES ($1, $2::event_type, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, race_id, event_type::text as event_type, description, time_offset_seconds,
+            car_number, car_id, team_id, driver_id, tire, fuel, created_at, updated_at
+        "#,
+    )
+    .bind(request.race_id)
+    .bind(request.event_type)
+    .bind(request.description)
+    .bind(request.time_offset_seconds)
+    .bind(request.car_number)
+    .bind(request.car_id)
+    .bind(request.team_id)
+    .bind(request.driver_id)
+    .bind(request.tire)
+    .bind(request.fuel)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(event)
+}
+
+pub async fn get_event_by_id(pool: &PgPool, id: Uuid) -> Result<Option<EventDb>, sqlx::Error> {
+    let event = sqlx::query_as::<_, EventDb>(
+        "SELECT id, race_id, event_type::text as event_type, description, time_offset_seconds, car_number, car_id, team_id, driver_id, tire, fuel, created_at, updated_at FROM event WHERE id = $1"
+    )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(event)
+}
+
+pub async fn list_events_by_race(
+    pool: &PgPool,
+    race_id: Uuid,
+) -> Result<Vec<EventDb>, sqlx::Error> {
+    let events = sqlx::query_as::<_, EventDb>(
+        "SELECT id, race_id, event_type::text as event_type, description, time_offset_seconds, car_number, car_id, team_id, driver_id, tire, fuel, created_at, updated_at FROM event WHERE race_id = $1 ORDER BY time_offset_seconds ASC, created_at ASC",
+    )
+    .bind(race_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(events)
+}
+
+pub async fn list_events_by_race_and_type(
+    pool: &PgPool,
+    race_id: Uuid,
+    event_type: &str,
+) -> Result<Vec<EventDb>, sqlx::Error> {
+    let events = sqlx::query_as::<_, EventDb>(
+        "SELECT id, race_id, event_type::text as event_type, description, time_offset_seconds, car_number, car_id, team_id, driver_id, tire, fuel, created_at, updated_at FROM event WHERE race_id = $1 AND event_type = $2::event_type ORDER BY time_offset_seconds ASC, created_at ASC",
+    )
+    .bind(race_id)
+    .bind(event_type)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(events)
+}
+
+pub async fn delete_event(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM event WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn delete_events_by_race(pool: &PgPool, race_id: Uuid) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM event WHERE race_id = $1")
+        .bind(race_id)
+        .execute(pool)
+        .await?;
+
+    Ok(result.rows_affected())
+}
+
 // ========== JWT Token Queries ==========
 
 pub async fn create_jwt_token(

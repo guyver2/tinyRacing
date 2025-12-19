@@ -209,3 +209,35 @@ pub struct CreateRegistrationRequest {
     pub race_id: Uuid,
     pub team_id: Uuid,
 }
+
+// Database representation of an Event
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventDb {
+    pub id: Uuid,
+    pub race_id: Uuid,
+    pub event_type: String,
+    pub description: String,
+    pub time_offset_seconds: f32,
+    pub car_number: Option<i32>,
+    pub car_id: Option<Uuid>,
+    pub team_id: Option<Uuid>,
+    pub driver_id: Option<Uuid>,
+    pub tire: Option<String>,
+    pub fuel: Option<f32>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateEventRequest {
+    pub race_id: Uuid,
+    pub event_type: String,
+    pub description: String,
+    pub time_offset_seconds: f32,
+    pub car_number: Option<i32>,
+    pub car_id: Option<Uuid>,
+    pub team_id: Option<Uuid>,
+    pub driver_id: Option<Uuid>,
+    pub tire: Option<String>,
+    pub fuel: Option<f32>,
+}

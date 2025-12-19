@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Event {
@@ -25,8 +26,11 @@ pub enum EventType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventData {
     pub car_number: Option<u32>,
+    pub car_id: Option<Uuid>,
     pub team_name: Option<String>,
+    pub team_id: Option<Uuid>,
     pub driver_name: Option<String>,
+    pub driver_id: Option<Uuid>,
     pub tire: Option<String>,
     pub fuel: Option<f32>,
     pub weather: Option<String>,

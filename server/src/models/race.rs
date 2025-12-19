@@ -1,4 +1,4 @@
-use crate::database::models::{DriverDb, TeamDb};
+use crate::database::models::{CreateEventRequest, DriverDb, TeamDb};
 use crate::database::queries as tdb;
 use crate::models::car::{Car, CarClientData, CarStats, CarStatus};
 use crate::models::driver::{Driver, DrivingStyle};
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use std::io::{self};
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub const MAX_PARTICIPANTS: i64 = 5;
@@ -73,6 +74,7 @@ pub struct RaceState {
     pub tick_duration_seconds: f32,
     pub events: Vec<Event>,
     pub race_id: Option<Uuid>, // ID of the race in the database (None for races loaded from config files)
+    pub db_pool: Option<Arc<PgPool>>, // Optional database pool for saving events
 }
 
 pub struct PitDecision {
@@ -153,7 +155,10 @@ pub fn create_event(
 ) -> Event {
     let event_data = EventData {
         car_number: car.map(|c| c.number),
+        car_id: car.map(|c| c.uid),
         team_name: car.map(|c| c.team.name.clone()),
+        team_id: car.map(|c| c.team.uid),
+        driver_id: car.map(|c| c.driver.uid),
         driver_name: car.map(|c| c.driver.name.clone()),
         tire: car.and_then(|c| Some(format!("{:?}", c.tire.type_))),
         fuel: car.and_then(|c| Some(c.fuel)),
@@ -169,7 +174,110 @@ pub fn create_event(
     }
 }
 
+/// Convert EventType enum to database string representation
+fn event_type_to_db_string(event_type: &EventType) -> String {
+    match event_type {
+        EventType::StartRace => "START_RACE".to_string(),
+        EventType::EndRace => "END_RACE".to_string(),
+        EventType::PitRequest => "PIT_REQUEST".to_string(),
+        EventType::PitCancel => "PIT_CANCEL".to_string(),
+        EventType::PitStop => "PIT_STOP".to_string(),
+        EventType::WeatherChange => "WEATHER_CHANGE".to_string(),
+        EventType::Accident => "ACCIDENT".to_string(),
+        EventType::CarFinished => "CAR_FINISHED".to_string(),
+        EventType::Dnf => "DNF".to_string(),
+        EventType::Other => "OTHER".to_string(),
+    }
+}
+
+/// Convert an Event to CreateEventRequest for database storage
+fn event_to_create_request(event: &Event, race_id: Uuid) -> CreateEventRequest {
+    CreateEventRequest {
+        race_id,
+        event_type: event_type_to_db_string(&event.event_type),
+        description: event.description.clone(),
+        time_offset_seconds: event.data.time_offset_seconds,
+        car_number: event.data.car_number.map(|n| n as i32),
+        car_id: event.data.car_id,
+        team_id: event.data.team_id,
+        driver_id: event.data.driver_id,
+        tire: event.data.tire.clone(),
+        fuel: event.data.fuel,
+    }
+}
+
+/// Save an event to the database asynchronously
+/// This function spawns a tokio task to save the event without blocking
+fn save_event_to_db(pool: Arc<PgPool>, event: Event, race_id: Uuid) {
+    let request = event_to_create_request(&event, race_id);
+    tokio::spawn(async move {
+        if let Err(e) = tdb::create_event(&pool, request).await {
+            eprintln!("Failed to save event to database: {}", e);
+        }
+    });
+}
+
 impl RaceState {
+    /// Set the database pool for saving events
+    pub fn set_db_pool(&mut self, pool: Arc<PgPool>) {
+        self.db_pool = Some(pool);
+    }
+
+    /// Register a new event in the race state and optionally save it to the database
+    /// This method adds the event to the in-memory events vector and saves it to DB if:
+    /// - A database pool is configured
+    /// - A race_id is set (race is from database)
+    pub fn register_event(
+        &mut self,
+        event_type: EventType,
+        description: String,
+        car: Option<&Car>,
+    ) {
+        let event_id = self.events.len() as u16;
+
+        let tire_str = if let Some(c) = car {
+            // For pit requests, use target_tire if available, otherwise current tire
+            c.target_tire
+                .as_ref()
+                .map(|t| format!("{:?}", t))
+                .or_else(|| Some(format!("{:?}", c.tire.type_)))
+        } else {
+            None
+        };
+
+        let event_data = EventData {
+            car_number: car.map(|c| c.number),
+            car_id: car.map(|c| c.uid),
+            team_name: car.map(|c| c.team.name.clone()),
+            team_id: car.map(|c| c.team.uid),
+            driver_name: car.map(|c| c.driver.name.clone()),
+            driver_id: car.map(|c| c.driver.uid),
+            tire: tire_str,
+            fuel: car.and_then(|c| c.target_fuel),
+            weather: None,
+            time_offset_seconds: self.tick_count as f32 * self.tick_duration_seconds,
+        };
+
+        let event = Event {
+            id: event_id,
+            description,
+            event_type,
+            data: event_data,
+        };
+
+        // Clone data needed for DB save before pushing (to avoid borrow issues)
+        let db_pool = self.db_pool.clone();
+        let race_id = self.race_id;
+
+        // Push event first
+        self.events.push(event.clone());
+
+        // Save to database if pool and race_id are available (after push to avoid borrow conflicts)
+        if let (Some(pool), Some(race_id)) = (db_pool, race_id) {
+            save_event_to_db(pool, event, race_id);
+        }
+    }
+
     /// Create an empty race state (no race loaded)
     /// This is used when the server starts without a pre-loaded race.
     /// Races should be started from scheduled race items via the API.
@@ -194,46 +302,8 @@ impl RaceState {
             tick_duration_seconds: 0.1,
             events: Vec::new(),
             race_id: None,
+            db_pool: None,
         }
-    }
-
-    /// Register a new event in the race state
-    pub fn register_event(
-        &mut self,
-        event_type: EventType,
-        description: String,
-        car: Option<&Car>,
-    ) {
-        let event_id = self.events.len() as u16;
-
-        let tire_str = if let Some(c) = car {
-            // For pit requests, use target_tire if available, otherwise current tire
-            c.target_tire
-                .as_ref()
-                .map(|t| format!("{:?}", t))
-                .or_else(|| Some(format!("{:?}", c.tire.type_)))
-        } else {
-            None
-        };
-
-        let event_data = EventData {
-            car_number: car.map(|c| c.number),
-            team_name: car.map(|c| c.team.name.clone()),
-            driver_name: car.map(|c| c.driver.name.clone()),
-            tire: tire_str,
-            fuel: car.and_then(|c| c.target_fuel),
-            weather: None,
-            time_offset_seconds: self.tick_count as f32 * self.tick_duration_seconds,
-        };
-
-        let event = Event {
-            id: event_id,
-            description,
-            event_type,
-            data: event_data,
-        };
-
-        self.events.push(event);
     }
 
     pub fn load_race_config(config_path: &str) -> Result<RaceState, io::Error> {
@@ -259,7 +329,7 @@ impl RaceState {
                 (&team_data.driver_2, &team_data.car_2),
             ] {
                 let car = Car {
-                    uid: None,
+                    uid: Uuid::new_v4(),
                     number: car_number,
                     team: team_data.data.clone(),
                     driver: driver.clone(),
@@ -297,6 +367,7 @@ impl RaceState {
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
             race_id: None, // Races loaded from config don't have a database ID
+            db_pool: None,
         })
     }
 
@@ -317,6 +388,7 @@ impl RaceState {
 
         // Convert TeamDb to Team
         let team = Team {
+            uid: team_db.id,
             number: team_db.number as u32,
             name: team_db.name,
             logo: team_db.logo,
@@ -351,7 +423,7 @@ impl RaceState {
 
             // Convert DriverDb to Driver
             let driver = Driver {
-                uid: Some(driver_db.id),
+                uid: driver_db.id,
                 name: format!("{} {}", driver_db.first_name, driver_db.last_name),
                 skill_level: driver_db.skill_level,
                 stamina: driver_db.stamina,
@@ -374,7 +446,7 @@ impl RaceState {
 
             // Create Car
             let car = Car {
-                uid: Some(car_db.id),
+                uid: car_db.id,
                 number: car_number,
                 team: team.clone(),
                 driver,
@@ -541,6 +613,7 @@ impl RaceState {
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
             race_id: Some(race_id), // Store the race ID for scheduled races
+            db_pool: None,
         })
     }
 
@@ -561,6 +634,7 @@ impl RaceState {
 
         for i in 0..5 {
             let team = Team {
+                uid: Uuid::new_v4(),
                 number: (i + 1) as u32,
                 name: team_names[i as usize].to_string(),
                 logo: format!("team_{}.png", i + 1),
@@ -577,7 +651,7 @@ impl RaceState {
                 let driver = drivers[car_index as usize].clone();
 
                 let car = Car {
-                    uid: None,
+                    uid: Uuid::new_v4(),
                     number: car_number,
                     team: team.clone(),
                     driver,
@@ -614,6 +688,7 @@ impl RaceState {
             tick_duration_seconds: 0.1, // 100ms
             events: Vec::new(),
             race_id: None, // Races created with new() don't have a database ID
+            db_pool: None,
         }
     }
 
@@ -708,6 +783,11 @@ impl RaceState {
         self.update_weather();
 
         let mut positions: Vec<&Car> = Vec::new(); // vector of references to cars
+        let number_finished = self
+            .cars
+            .values()
+            .filter(|c| c.status == CarStatus::Finished)
+            .count();
 
         for car in self.cars.values_mut() {
             if car.status == CarStatus::Dnf || car.status == CarStatus::Finished {
@@ -764,15 +844,17 @@ impl RaceState {
                         car.number, tire_str, fuel_str
                     );
 
-                    // Create event data manually to avoid borrowing conflict
-                    let event_id = self.events.len() as u16;
                     let event = create_event(
-                        event_id,
+                        self.events.len() as u16,
                         self.tick_count as f32 * self.tick_duration_seconds,
                         EventType::PitRequest,
                         description,
                         Some(&car),
                     );
+                    // Save to database if pool and race_id are available
+                    if let (Some(pool), Some(race_id)) = (self.db_pool.clone(), self.race_id) {
+                        save_event_to_db(pool, event.clone(), race_id);
+                    }
                     self.events.push(event);
                 }
             }
@@ -839,11 +921,28 @@ impl RaceState {
                     car.lap_percentage = 0.0;
                     car.status = CarStatus::Finished;
                     car.finished_time = self.tick_count;
+                    let event = create_event(
+                        self.events.len() as u16,
+                        self.tick_count as f32 * self.tick_duration_seconds,
+                        EventType::CarFinished,
+                        format!(
+                            "Car {} finished the race in position {}.",
+                            car.number,
+                            number_finished + 1
+                        ),
+                        Some(&car),
+                    );
+                    // Save to database if pool and race_id are available
+                    if let (Some(pool), Some(race_id)) = (self.db_pool.clone(), self.race_id) {
+                        save_event_to_db(pool, event.clone(), race_id);
+                    }
+                    self.events.push(event);
                 }
 
                 // Check for pit stop request at lap boundary
                 if car.pit_request && car.lap < self.track.laps {
                     car.status = CarStatus::Pit;
+                    car.lap_percentage = 0.0001; // 1% of the next lap, prevent passing in pit
                     car.pit_request = false;
                     car.pit_time_remaining = 50;
 
@@ -862,15 +961,17 @@ impl RaceState {
                         car.number, tire_str, fuel_str
                     );
 
-                    // Create event data manually to avoid borrowing conflict
-                    let event_id = self.events.len() as u16;
                     let event = create_event(
-                        event_id,
+                        self.events.len() as u16,
                         self.tick_count as f32 * self.tick_duration_seconds,
                         EventType::PitStop,
                         description,
                         Some(&car),
                     );
+                    // Save to database if pool and race_id are available
+                    if let (Some(pool), Some(race_id)) = (self.db_pool.clone(), self.race_id) {
+                        save_event_to_db(pool, event.clone(), race_id);
+                    }
                     self.events.push(event);
 
                     // println!("Car {} entering pits (Duration: {} ticks).", car.number, car.pit_time_remaining);
@@ -895,6 +996,18 @@ impl RaceState {
                 // println!("Car {} ran out of fuel!", car.number);
                 car.status = CarStatus::Dnf;
                 car.finished_time = self.tick_count;
+                let event = create_event(
+                    self.events.len() as u16,
+                    self.tick_count as f32 * self.tick_duration_seconds,
+                    EventType::Dnf,
+                    format!("Car {} ran out of fuel!", car.number),
+                    Some(&car),
+                );
+                // Save to database if pool and race_id are available
+                if let (Some(pool), Some(race_id)) = (self.db_pool.clone(), self.race_id) {
+                    save_event_to_db(pool, event.clone(), race_id);
+                }
+                self.events.push(event);
             }
 
             // Update tire wear based on car stats
@@ -1011,6 +1124,11 @@ fn update_race_finished(state: &mut RaceState) {
     let mut race_finished = true;
     let mut someone_finished = false;
     let mut tot_done = 0;
+    let number_finished = state
+        .cars
+        .values()
+        .filter(|c| c.status == CarStatus::Finished)
+        .count();
     for car in state.cars.values_mut() {
         if car.status == CarStatus::Finished {
             someone_finished = true;
@@ -1021,6 +1139,22 @@ fn update_race_finished(state: &mut RaceState) {
             car.finished_time = state.tick_count;
             someone_finished = true;
             tot_done += 1;
+            let event = create_event(
+                state.events.len() as u16,
+                state.tick_count as f32 * state.tick_duration_seconds,
+                EventType::CarFinished,
+                format!(
+                    "Car {} finished the race in position {}.",
+                    car.number,
+                    number_finished + 1
+                ),
+                Some(&car),
+            );
+            // Save to database if pool and race_id are available
+            if let (Some(pool), Some(race_id)) = (state.db_pool.clone(), state.race_id) {
+                save_event_to_db(pool, event.clone(), race_id);
+            }
+            state.events.push(event);
         } else if car.status == CarStatus::Racing || car.status == CarStatus::Pit {
             race_finished = false;
         } else if car.status == CarStatus::Dnf {
