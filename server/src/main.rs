@@ -22,7 +22,7 @@ mod ncurses_ui;
 use crate::ncurses_ui::*;
 
 mod database;
-use crate::database::{finish_race, init_from_env, Database};
+use crate::database::{finish_race, init_from_env, save_race_results, Database};
 mod api;
 mod auth;
 mod auth_middleware;
@@ -264,6 +264,11 @@ async fn main() {
             let client_view_opt: Option<RaceStateClientView>;
             let race_id_opt: Option<Uuid>;
             let race_just_finished: bool;
+            let race_result_snapshot: Option<(
+                std::collections::HashMap<u32, crate::models::car::Car>,
+                u64,
+                f32,
+            )>;
             let should_restart = {
                 let mut state_guard = game_state_clone_loop.lock().unwrap();
                 let previous_run_state = state_guard.run_state.clone();
@@ -273,6 +278,17 @@ async fn main() {
 
                 race_just_finished = state_guard.run_state == RaceRunState::Finished
                     && previous_run_state != RaceRunState::Finished;
+
+                // Capture race state snapshot for saving results
+                race_result_snapshot = if race_just_finished {
+                    Some((
+                        state_guard.cars.clone(),
+                        state_guard.tick_count,
+                        state_guard.tick_duration_seconds,
+                    ))
+                } else {
+                    None
+                };
 
                 let should_restart = if race_just_finished {
                     game_log_tx.send("Race Finished!".to_string()).ok();
@@ -284,7 +300,7 @@ async fn main() {
                 should_restart
             };
 
-            // Update database status to FINISHED if this is a scheduled race that just finished
+            // Update database status to FINISHED and save race results if this is a scheduled race that just finished
             // Do this outside the mutex guard to avoid holding it across await
             if race_just_finished {
                 if let Some(race_id) = race_id_opt {
@@ -293,6 +309,29 @@ async fn main() {
                             game_log_tx
                                 .send(format!("Failed to update race status to FINISHED: {:?}", e))
                                 .ok();
+                        }
+
+                        // Save race results
+                        if let Some((cars, tick_count, tick_duration_seconds)) =
+                            race_result_snapshot
+                        {
+                            if let Err(e) = crate::database::save_race_results(
+                                pool,
+                                race_id,
+                                &cars,
+                                tick_count,
+                                tick_duration_seconds,
+                            )
+                            .await
+                            {
+                                game_log_tx
+                                    .send(format!("Failed to save race results: {:?}", e))
+                                    .ok();
+                            } else {
+                                game_log_tx
+                                    .send("Race results saved successfully.".to_string())
+                                    .ok();
+                            }
                         }
                     }
                 }

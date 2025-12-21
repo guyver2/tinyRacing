@@ -241,3 +241,35 @@ pub struct CreateEventRequest {
     pub tire: Option<String>,
     pub fuel: Option<f32>,
 }
+
+// Database representation of a Race Result
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct RaceResultDb {
+    pub id: Uuid,
+    pub race_id: Uuid,
+    pub car_id: Uuid,
+    pub driver_id: Uuid,
+    pub team_id: Uuid,
+    pub car_number: i32,
+    pub final_position: i32,
+    pub race_time_seconds: f32,
+    pub status: String, // race_result_status enum as string
+    pub laps_completed: i32,
+    pub total_distance_km: f32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRaceResultRequest {
+    pub race_id: Uuid,
+    pub car_id: Uuid,
+    pub driver_id: Uuid,
+    pub team_id: Uuid,
+    pub car_number: i32,
+    pub final_position: i32,
+    pub race_time_seconds: f32,
+    pub status: String, // "FINISHED" or "DNF"
+    pub laps_completed: i32,
+    pub total_distance_km: f32,
+}

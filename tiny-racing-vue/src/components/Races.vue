@@ -167,6 +167,7 @@
                   <th>Track</th>
                   <th>Laps</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,9 +184,120 @@
                       {{ formatStatus(race.status) }}
                     </span>
                   </td>
+                  <td class="actions-cell">
+                    <button
+                      v-if="race.status === 'FINISHED'"
+                      @click="handleViewResults(race.id)"
+                      class="btn btn-primary btn-small"
+                    >
+                      View Results
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- Race Results Modal -->
+        <div v-if="showResults" class="modal-overlay" @click="closeResults">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <div class="modal-header-content">
+                <h3>Race Results</h3>
+                <div v-if="selectedRace" class="race-details">
+                  <div class="race-detail-item">
+                    <span class="detail-label">Track:</span>
+                    <span class="detail-value">{{ getTrackName(selectedRace.track_id) }}</span>
+                  </div>
+                  <div class="race-detail-item">
+                    <span class="detail-label">Laps:</span>
+                    <span class="detail-value">{{ selectedRace.laps }}</span>
+                  </div>
+                  <div class="race-detail-item">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">{{
+                      selectedRace.start_datetime ? formatDate(selectedRace.start_datetime) : 'N/A'
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+              <button @click="closeResults" class="btn-close" type="button" aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div class="modal-body">
+              <div v-if="loadingResults" class="loading-message">Loading results...</div>
+              <div v-else-if="resultsError" class="error-message">{{ resultsError }}</div>
+              <div v-else-if="raceResults.length === 0" class="empty-state">
+                <p>No results available for this race.</p>
+              </div>
+              <div v-else class="results-table-wrapper">
+                <table class="results-table">
+                  <thead>
+                    <tr>
+                      <th>Position</th>
+                      <th>Car #</th>
+                      <th>Driver</th>
+                      <th>Team</th>
+                      <th>Status</th>
+                      <th>Laps</th>
+                      <th>Time</th>
+                      <th>Distance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="result in raceResults"
+                      :key="result.id"
+                      :class="{
+                        'result-finished': result.status === 'FINISHED',
+                        'result-dnf': result.status === 'DNF',
+                      }"
+                    >
+                      <td class="position-cell">{{ result.final_position }}</td>
+                      <td>{{ result.car_number }}</td>
+                      <td>
+                        <div class="driver-cell">
+                          <img
+                            v-if="getDriverAvatar(result.driver_id)"
+                            :src="getDriverAvatar(result.driver_id) || ''"
+                            :alt="getDriverName(result.driver_id)"
+                            class="driver-avatar"
+                          />
+                          <span>{{ getDriverName(result.driver_id) }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="team-cell">
+                          <img
+                            v-if="getTeamLogo(result.team_id)"
+                            :src="getTeamLogo(result.team_id) || ''"
+                            :alt="getTeamName(result.team_id)"
+                            class="team-logo"
+                          />
+                          <span>{{ getTeamName(result.team_id) }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          class="status-badge"
+                          :class="{
+                            'status-finished': result.status === 'FINISHED',
+                            'status-dnf': result.status === 'DNF',
+                          }"
+                        >
+                          {{ result.status }}
+                        </span>
+                      </td>
+                      <td>{{ result.laps_completed }}</td>
+                      <td>{{ formatRaceTime(result.race_time_seconds) }}</td>
+                      <td>{{ result.total_distance_km.toFixed(2) }} km</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -202,18 +314,24 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import {
   getRaces,
+  getRace,
   createRace,
   getTracks,
   getMyTeam,
+  getTeam,
+  getDriver,
   registerForRace,
   unregisterFromRace,
   getRaceRegistrations,
   startRaceNow,
+  getRaceResults,
   type RaceDb,
   type CreateRaceRequest,
   type TrackDb,
   type TeamDb,
+  type DriverDb,
   type RegistrationDb,
+  type RaceResultDb,
 } from '../services/ApiService';
 
 const props = defineProps<{
@@ -232,6 +350,14 @@ const myTeam = ref<TeamDb | null>(null);
 const registrations = ref<Map<string, RegistrationDb>>(new Map());
 const registering = ref<Map<string, boolean>>(new Map());
 const starting = ref<Map<string, boolean>>(new Map());
+const showResults = ref(false);
+const selectedRaceId = ref<string | null>(null);
+const selectedRace = ref<RaceDb | null>(null);
+const raceResults = ref<RaceResultDb[]>([]);
+const loadingResults = ref(false);
+const resultsError = ref<string | null>(null);
+const driversMap = ref<Map<string, DriverDb>>(new Map());
+const teamsMap = ref<Map<string, TeamDb>>(new Map());
 
 const emit = defineEmits<{
   navigate: [view: string];
@@ -388,6 +514,98 @@ async function handleStartNow(raceId: string) {
 function handleViewRace(raceId: string) {
   // For ongoing races, just navigate to the game view without restarting
   emit('navigate', 'game');
+}
+
+async function handleViewResults(raceId: string) {
+  selectedRaceId.value = raceId;
+  showResults.value = true;
+  loadingResults.value = true;
+  resultsError.value = null;
+  raceResults.value = [];
+  selectedRace.value = null;
+  driversMap.value.clear();
+  teamsMap.value.clear();
+
+  try {
+    // Find the race in the loaded races array
+    const race = races.value.find((r) => r.id === raceId);
+    if (race) {
+      selectedRace.value = race;
+    } else {
+      // If not found, fetch it
+      selectedRace.value = await getRace(raceId);
+    }
+    raceResults.value = await getRaceResults(raceId);
+
+    // Load driver and team information for all results
+    const uniqueDriverIds = [...new Set(raceResults.value.map((r) => r.driver_id))];
+    const uniqueTeamIds = [...new Set(raceResults.value.map((r) => r.team_id))];
+
+    // Load drivers in parallel
+    const driverPromises = uniqueDriverIds.map(async (driverId) => {
+      try {
+        const driver = await getDriver(driverId);
+        driversMap.value.set(driverId, driver);
+      } catch (err) {
+        console.error(`Failed to load driver ${driverId}:`, err);
+      }
+    });
+
+    // Load teams in parallel
+    const teamPromises = uniqueTeamIds.map(async (teamId) => {
+      try {
+        const team = await getTeam(teamId);
+        teamsMap.value.set(teamId, team);
+      } catch (err) {
+        console.error(`Failed to load team ${teamId}:`, err);
+      }
+    });
+
+    await Promise.all([...driverPromises, ...teamPromises]);
+  } catch (err) {
+    resultsError.value = err instanceof Error ? err.message : 'Failed to load race results';
+  } finally {
+    loadingResults.value = false;
+  }
+}
+
+function closeResults() {
+  showResults.value = false;
+  selectedRaceId.value = null;
+  selectedRace.value = null;
+  raceResults.value = [];
+  resultsError.value = null;
+  driversMap.value.clear();
+  teamsMap.value.clear();
+}
+
+function formatRaceTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const secs = (seconds % 60).toFixed(2);
+  return `${minutes}:${secs.padStart(5, '0')}`;
+}
+
+function getDriverName(driverId: string): string {
+  const driver = driversMap.value.get(driverId);
+  if (driver) {
+    return `${driver.first_name} ${driver.last_name}`;
+  }
+  return `Driver ${driverId.slice(0, 8)}`;
+}
+
+function getDriverAvatar(driverId: string): string | null {
+  const driver = driversMap.value.get(driverId);
+  return driver?.avatar_url || null;
+}
+
+function getTeamName(teamId: string): string {
+  const team = teamsMap.value.get(teamId);
+  return team?.name || `Team ${teamId.slice(0, 8)}`;
+}
+
+function getTeamLogo(teamId: string): string | null {
+  const team = teamsMap.value.get(teamId);
+  return team?.logo || null;
 }
 
 const isRegistered = (raceId: string): boolean => {
@@ -909,6 +1127,203 @@ onMounted(async () => {
 
   .actions-cell {
     min-width: 150px;
+  }
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  max-width: 90%;
+  max-height: 90vh;
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header-content {
+  flex: 1;
+}
+
+.modal-header h3 {
+  margin: 0 0 1rem 0;
+  color: #1a1a2e;
+}
+
+.race-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.race-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.detail-value {
+  color: #1a1a2e;
+  font-size: 0.875rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Results Table Styles */
+.results-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  table-layout: auto;
+  display: table;
+}
+
+.results-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #1a1a2e;
+  border-bottom: 2px solid #e0e0e0;
+  background-color: #f5f5f5;
+  position: sticky;
+  top: 0;
+}
+
+.results-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  color: #333;
+  vertical-align: middle;
+}
+
+.driver-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.driver-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.team-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.results-table .team-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.results-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.results-table tbody tr.result-finished {
+  border-left: 4px solid #4caf50;
+}
+
+.results-table tbody tr.result-dnf {
+  border-left: 4px solid #f44336;
+}
+
+.position-cell {
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.status-finished {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-dnf {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95%;
+    max-height: 95vh;
+  }
+
+  .modal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-header-content {
+    width: 100%;
+  }
+
+  .race-details {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .race-detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .results-table {
+    font-size: 0.875rem;
+  }
+
+  .results-table th,
+  .results-table td {
+    padding: 0.5rem 0.5rem;
   }
 }
 </style>

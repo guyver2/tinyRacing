@@ -1174,3 +1174,136 @@ pub async fn delete_jwt_token_by_token(pool: &PgPool, token: &str) -> Result<boo
 
     Ok(result.rows_affected() > 0)
 }
+
+// ========== Race Result Queries ==========
+
+pub async fn create_race_result(
+    pool: &PgPool,
+    request: CreateRaceResultRequest,
+) -> Result<RaceResultDb, sqlx::Error> {
+    let result = sqlx::query_as::<_, RaceResultDb>(
+        r#"
+        INSERT INTO race_result (
+            race_id, car_id, driver_id, team_id, car_number,
+            final_position, race_time_seconds, status, laps_completed,
+            total_distance_km
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::race_result_status, $9, $10)
+        ON CONFLICT (race_id, car_id) DO UPDATE SET
+            final_position = EXCLUDED.final_position,
+            race_time_seconds = EXCLUDED.race_time_seconds,
+            status = EXCLUDED.status,
+            laps_completed = EXCLUDED.laps_completed,
+            total_distance_km = EXCLUDED.total_distance_km,
+            updated_at = NOW()
+        RETURNING id, race_id, car_id, driver_id, team_id, car_number,
+            final_position, race_time_seconds, status::text as status,
+            laps_completed, total_distance_km, created_at, updated_at
+        "#,
+    )
+    .bind(request.race_id)
+    .bind(request.car_id)
+    .bind(request.driver_id)
+    .bind(request.team_id)
+    .bind(request.car_number)
+    .bind(request.final_position)
+    .bind(request.race_time_seconds)
+    .bind(request.status)
+    .bind(request.laps_completed)
+    .bind(request.total_distance_km)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result)
+}
+
+pub async fn get_race_results_by_race(
+    pool: &PgPool,
+    race_id: Uuid,
+) -> Result<Vec<RaceResultDb>, sqlx::Error> {
+    let results = sqlx::query_as::<_, RaceResultDb>(
+        r#"
+        SELECT id, race_id, car_id, driver_id, team_id, car_number,
+            final_position, race_time_seconds, status::text as status,
+            laps_completed, total_distance_km, created_at, updated_at
+        FROM race_result
+        WHERE race_id = $1
+        ORDER BY final_position ASC
+        "#,
+    )
+    .bind(race_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(results)
+}
+
+pub async fn get_race_result_by_race_and_car(
+    pool: &PgPool,
+    race_id: Uuid,
+    car_id: Uuid,
+) -> Result<Option<RaceResultDb>, sqlx::Error> {
+    let result = sqlx::query_as::<_, RaceResultDb>(
+        r#"
+        SELECT id, race_id, car_id, driver_id, team_id, car_number,
+            final_position, race_time_seconds, status::text as status,
+            laps_completed, total_distance_km, created_at, updated_at
+        FROM race_result
+        WHERE race_id = $1 AND car_id = $2
+        "#,
+    )
+    .bind(race_id)
+    .bind(car_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(result)
+}
+
+/// Save race results for all cars in a race
+/// This function takes a snapshot of all cars and their final state
+pub async fn save_race_results(
+    pool: &PgPool,
+    race_id: Uuid,
+    cars: &std::collections::HashMap<u32, crate::models::car::Car>,
+    tick_count: u64,
+    tick_duration_seconds: f32,
+) -> Result<(), sqlx::Error> {
+    for car in cars.values() {
+        // Calculate race time in seconds
+        // For finished/DNF cars, use finished_time; for others, use current tick_count
+        let race_time_ticks = if car.finished_time > 0 {
+            car.finished_time
+        } else {
+            tick_count
+        };
+        let race_time_seconds = race_time_ticks as f32 * tick_duration_seconds;
+
+        // Determine status
+        let status = match car.status {
+            crate::models::car::CarStatus::Finished => "FINISHED",
+            crate::models::car::CarStatus::Dnf => "DNF",
+            _ => "DNF", // Any other status (Racing, Pit) is treated as DNF if race ended
+        };
+
+        let request = CreateRaceResultRequest {
+            race_id,
+            car_id: car.uid,
+            driver_id: car.driver.uid,
+            team_id: car.team.uid,
+            car_number: car.number as i32,
+            final_position: car.race_position as i32,
+            race_time_seconds,
+            status: status.to_string(),
+            laps_completed: car.lap as i32,
+            total_distance_km: car.total_distance,
+        };
+
+        if let Err(e) = create_race_result(pool, request).await {
+            eprintln!("Failed to save race result for car {}: {}", car.number, e);
+            // Continue with other cars even if one fails
+        }
+    }
+
+    Ok(())
+}

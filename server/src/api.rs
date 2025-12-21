@@ -298,6 +298,7 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
             get(get_race_registrations),
         )
         .route("/races/{race_id}/start-now", post(start_race_now))
+        .route("/races/{race_id}/results", get(get_race_results))
         .route("/teams/{team_id}", get(get_team))
         .route("/teams/{team_id}/drivers", get(get_team_drivers))
         .route("/teams/{team_id}/cars", get(get_team_cars))
@@ -1245,6 +1246,32 @@ async fn get_race(
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
 
     Ok(success(Some(race), None))
+}
+
+// Get race results for a race
+async fn get_race_results(
+    Path(race_id): Path<String>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::RaceResultDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&race_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid race ID format: {}", race_id)))?;
+
+    // Verify race exists
+    let _race = tdb::get_race_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
+
+    // Get race results
+    let results = tdb::get_race_results_by_race(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race results: {}", e)))?;
+
+    Ok(success(Some(results), None))
 }
 
 // Create a new race
