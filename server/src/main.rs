@@ -22,7 +22,7 @@ mod ncurses_ui;
 use crate::ncurses_ui::*;
 
 mod database;
-use crate::database::{finish_race, init_from_env, save_race_results, Database};
+use crate::database::{finish_race, init_from_env, Database};
 mod api;
 mod auth;
 mod auth_middleware;

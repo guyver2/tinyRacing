@@ -790,16 +790,41 @@ pub async fn list_races(
     pool: &PgPool,
     limit: i64,
     offset: i64,
+    status_filter: Option<Vec<&str>>,
 ) -> Result<Vec<RaceDb>, sqlx::Error> {
-    let races = sqlx::query_as::<_, RaceDb>(
-        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY created_at DESC LIMIT $1 OFFSET $2"
-    )
+    let query = if let Some(statuses) = status_filter {
+        // Build a query with status filtering
+        let status_placeholders: Vec<String> =
+            (1..=statuses.len()).map(|i| format!("${}", i)).collect();
+        let status_list = status_placeholders.join(", ");
+        let base_query = format!(
+            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race WHERE status::text IN ({}) ORDER BY start_datetime ASC LIMIT ${} OFFSET ${}",
+            status_list,
+            statuses.len() + 1,
+            statuses.len() + 2
+        );
+
+        let mut query_builder = sqlx::query_as::<_, RaceDb>(&base_query);
+        for status in statuses {
+            query_builder = query_builder.bind(status);
+        }
+        query_builder
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?
+    } else {
+        // No status filter, return all races
+        sqlx::query_as::<_, RaceDb>(
+            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY start_datetime ASC LIMIT $1 OFFSET $2"
+        )
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
-        .await?;
+        .await?
+    };
 
-    Ok(races)
+    Ok(query)
 }
 
 pub async fn list_races_by_creator(

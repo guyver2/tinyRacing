@@ -87,9 +87,18 @@ fn is_ai_player(player_uuid: &Option<String>) -> bool {
     player_uuid.is_none()
 }
 
-pub fn ai_pit_decision(car: Car, track_wetness: f32, total_laps: u32) -> PitDecision {
-    // skip if not AI, already pitting or pitted
-    if !is_ai_player(&car.player_uuid) || car.pit_request || car.status == CarStatus::Pit {
+pub fn ai_pit_decision(
+    car: Car,
+    track_wetness: f32,
+    total_laps: u32,
+    last_lap: bool,
+) -> PitDecision {
+    // skip if not AI, already pitting or pitted, or last lap
+    if !is_ai_player(&car.player_uuid)
+        || car.pit_request
+        || car.status == CarStatus::Pit
+        || last_lap
+    {
         return PitDecision {
             pit: false,
             tire: None,
@@ -823,7 +832,12 @@ impl RaceState {
             }
 
             // --- Handle AI input ---
-            let decision = ai_pit_decision(car.clone(), self.track.wetness, self.track.laps);
+            let decision = ai_pit_decision(
+                car.clone(),
+                self.track.wetness,
+                self.track.laps,
+                self.run_state == RaceRunState::LastLap,
+            );
             if decision.pit == true {
                 let was_requested = car.pit_request;
                 car.pit_request = true;
@@ -1170,6 +1184,14 @@ fn update_race_finished(state: &mut RaceState) {
             state.run_state = RaceRunState::Finished;
         } else {
             state.run_state = RaceRunState::LastLap;
+            // cancel all pit requests
+            for car in state.cars.values_mut() {
+                if car.pit_request {
+                    car.pit_request = false;
+                    car.target_tire = None;
+                    car.target_fuel = None;
+                }
+            }
         }
     }
 }

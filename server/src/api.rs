@@ -161,6 +161,15 @@ struct PaginationParams {
     offset: i64,
 }
 
+#[derive(Deserialize)]
+struct RaceQueryParams {
+    #[serde(default = "default_limit")]
+    limit: i64,
+    #[serde(default = "default_offset")]
+    offset: i64,
+    status: Option<String>, // Filter by status: "upcoming" or "done"
+}
+
 fn default_limit() -> i64 {
     crate::constants::DEFAULT_PAGE_SIZE
 }
@@ -1215,13 +1224,21 @@ async fn get_player(
 // Get all races
 async fn get_races(
     State(state): State<AppState>,
-    Query(params): Query<PaginationParams>,
+    Query(params): Query<RaceQueryParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::RaceDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let races = tdb::list_races(pool, params.limit, params.offset)
+
+    // Determine status filter based on the status parameter
+    let status_filter = match params.status.as_deref() {
+        Some("upcoming") => Some(vec!["REGISTRATION_OPEN", "REGISTRATION_CLOSED", "ONGOING"]),
+        Some("done") => Some(vec!["FINISHED", "CANCELED"]),
+        _ => None, // No filter, return all races
+    };
+
+    let races = tdb::list_races(pool, params.limit, params.offset, status_filter)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch races: {}", e)))?;
 

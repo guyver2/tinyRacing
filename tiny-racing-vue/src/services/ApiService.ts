@@ -595,9 +595,25 @@ export interface CreateRaceRequest {
   description?: string | null;
 }
 
-// Get all races
-export async function getRaces(limit?: number, offset?: number): Promise<RaceDb[]> {
-  const url = buildPaginatedUrl('/races', { limit, offset });
+// Get all races (optionally filtered by status)
+export async function getRaces(
+  limit?: number,
+  offset?: number,
+  status?: 'upcoming' | 'done',
+): Promise<RaceDb[]> {
+  const params: Record<string, string> = {};
+  if (limit !== undefined) {
+    params.limit = limit.toString();
+  }
+  if (offset !== undefined) {
+    params.offset = offset.toString();
+  }
+  if (status) {
+    params.status = status;
+  }
+
+  const queryString = new URLSearchParams(params).toString();
+  const url = queryString ? `/races?${queryString}` : '/races';
   const response = await apiRequest(url);
 
   if (!response.ok) {
@@ -610,6 +626,16 @@ export async function getRaces(limit?: number, offset?: number): Promise<RaceDb[
   }
 
   throw new Error(data.message || 'Failed to fetch races');
+}
+
+// Get upcoming races (REGISTRATION_OPEN, REGISTRATION_CLOSED, ONGOING)
+export async function getUpcomingRaces(limit?: number, offset?: number): Promise<RaceDb[]> {
+  return getRaces(limit, offset, 'upcoming');
+}
+
+// Get done races (FINISHED, CANCELED)
+export async function getDoneRaces(limit?: number, offset?: number): Promise<RaceDb[]> {
+  return getRaces(limit, offset, 'done');
 }
 
 // Get a single race by ID

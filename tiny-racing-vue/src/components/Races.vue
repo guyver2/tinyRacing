@@ -62,15 +62,15 @@
       </div>
 
       <!-- Loading state -->
-      <div v-if="loading" class="loading-message">Loading races...</div>
+      <div v-if="loadingUpcoming || loadingDone" class="loading-message">Loading races...</div>
 
       <!-- Error state -->
       <div v-if="error" class="error-message">{{ error }}</div>
 
       <!-- Races list -->
-      <div v-if="!loading && !error" class="races-list">
+      <div v-if="!loadingUpcoming && !loadingDone && !error" class="races-list">
         <!-- Upcoming Races Section (REGISTRATION_OPEN, REGISTRATION_CLOSED, ONGOING) -->
-        <div v-if="upcomingRaces.length > 0 || ongoingRaces.length > 0" class="race-section">
+        <div v-if="displayUpcomingRaces.length > 0 || loadingUpcoming" class="race-section">
           <h3 class="section-header">Upcoming Races</h3>
           <div class="races-table-wrapper">
             <table class="races-table">
@@ -86,7 +86,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="race in [...upcomingRaces, ...ongoingRaces]"
+                  v-for="race in displayUpcomingRaces"
                   :key="race.id"
                   :class="getRaceStatusClass(race.status)"
                 >
@@ -112,7 +112,8 @@
                     >
                       <button
                         v-if="canRegister(race)"
-                        @click="handleRegister(race.id)"
+                        type="button"
+                        @click.prevent="handleRegister(race.id)"
                         class="btn btn-success btn-small"
                         :disabled="registering.get(race.id) || starting.get(race.id)"
                       >
@@ -121,7 +122,8 @@
                       </button>
                       <button
                         v-if="canUnregister(race)"
-                        @click="handleUnregister(race.id)"
+                        type="button"
+                        @click.prevent="handleUnregister(race.id)"
                         class="btn btn-warning btn-small"
                         :disabled="registering.get(race.id) || starting.get(race.id)"
                       >
@@ -134,7 +136,8 @@
                       v-if="
                         race.status === 'REGISTRATION_OPEN' || race.status === 'REGISTRATION_CLOSED'
                       "
-                      @click="handleStartNow(race.id)"
+                      type="button"
+                      @click.prevent="handleStartNow(race.id)"
                       class="btn btn-primary btn-small"
                       :disabled="starting.get(race.id)"
                     >
@@ -144,7 +147,8 @@
                     <!-- View race button for ongoing races -->
                     <button
                       v-if="race.status === 'ONGOING'"
-                      @click="handleViewRace(race.id)"
+                      type="button"
+                      @click.prevent="handleViewRace(race.id)"
                       class="btn btn-primary btn-small"
                     >
                       View Race
@@ -154,10 +158,21 @@
               </tbody>
             </table>
           </div>
+          <!-- Load More button for upcoming races -->
+          <div v-if="hasMoreUpcoming || loadingMoreUpcoming" class="load-more-container">
+            <button
+              @click="loadUpcomingRaces(false)"
+              class="btn btn-secondary"
+              :disabled="loadingMoreUpcoming"
+            >
+              <span v-if="loadingMoreUpcoming">Loading...</span>
+              <span v-else>Load More</span>
+            </button>
+          </div>
         </div>
 
         <!-- Done Races Section (FINISHED, CANCELED) -->
-        <div v-if="finishedRaces.length > 0 || canceledRaces.length > 0" class="race-section">
+        <div v-if="displayDoneRaces.length > 0 || loadingDone" class="race-section">
           <h3 class="section-header">Done Races</h3>
           <div class="races-table-wrapper">
             <table class="races-table">
@@ -172,7 +187,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="race in [...finishedRaces, ...canceledRaces]"
+                  v-for="race in displayDoneRaces"
                   :key="race.id"
                   :class="getRaceStatusClass(race.status)"
                 >
@@ -187,7 +202,8 @@
                   <td class="actions-cell">
                     <button
                       v-if="race.status === 'FINISHED'"
-                      @click="handleViewResults(race.id)"
+                      type="button"
+                      @click.prevent="handleViewResults(race.id)"
                       class="btn btn-primary btn-small"
                     >
                       View Results
@@ -196,6 +212,17 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+          <!-- Load More button for done races -->
+          <div v-if="hasMoreDone || loadingMoreDone" class="load-more-container">
+            <button
+              @click="loadDoneRaces(false)"
+              class="btn btn-secondary"
+              :disabled="loadingMoreDone"
+            >
+              <span v-if="loadingMoreDone">Loading...</span>
+              <span v-else>Load More</span>
+            </button>
           </div>
         </div>
 
@@ -302,7 +329,15 @@
         </div>
 
         <!-- Empty state -->
-        <div v-if="races.length === 0" class="empty-state">
+        <div
+          v-if="
+            displayUpcomingRaces.length === 0 &&
+            displayDoneRaces.length === 0 &&
+            !loadingUpcoming &&
+            !loadingDone
+          "
+          class="empty-state"
+        >
           <p>No races found. Create one to get started!</p>
         </div>
       </div>
@@ -313,7 +348,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  getRaces,
+  getUpcomingRaces,
+  getDoneRaces,
   getRace,
   createRace,
   getTracks,
@@ -338,9 +374,11 @@ const props = defineProps<{
   authenticated: boolean;
 }>();
 
-const loading = ref(false);
+const loadingUpcoming = ref(false);
+const loadingDone = ref(false);
 const error = ref<string | null>(null);
-const races = ref<RaceDb[]>([]);
+const upcomingRaces = ref<RaceDb[]>([]);
+const doneRaces = ref<RaceDb[]>([]);
 const tracks = ref<TrackDb[]>([]);
 const creating = ref(false);
 const createError = ref<string | null>(null);
@@ -359,6 +397,15 @@ const resultsError = ref<string | null>(null);
 const driversMap = ref<Map<string, DriverDb>>(new Map());
 const teamsMap = ref<Map<string, TeamDb>>(new Map());
 
+// Pagination state
+const PAGE_SIZE = 10;
+const upcomingOffset = ref(0);
+const doneOffset = ref(0);
+const hasMoreUpcoming = ref(true);
+const hasMoreDone = ref(true);
+const loadingMoreUpcoming = ref(false);
+const loadingMoreDone = ref(false);
+
 const emit = defineEmits<{
   navigate: [view: string];
 }>();
@@ -370,51 +417,132 @@ const formData = ref<Omit<CreateRaceRequest, 'status'>>({
   description: null,
 });
 
-// Filter races by status
-const upcomingRaces = computed(() => {
-  const filtered = races.value.filter(
+// Computed properties for displaying races
+const displayUpcomingRaces = computed(() => {
+  // Separate upcoming races (REGISTRATION_OPEN, REGISTRATION_CLOSED) and ongoing races
+  const upcoming = upcomingRaces.value.filter(
     (race) => race.status === 'REGISTRATION_OPEN' || race.status === 'REGISTRATION_CLOSED',
   );
+  const ongoing = upcomingRaces.value.filter((race) => race.status === 'ONGOING');
 
-  // Sort chronologically by start_datetime (earliest first)
-  // Races without start_datetime go to the end
-  const sorted = filtered.sort((a, b) => {
+  // Sort upcoming chronologically by start_datetime (earliest first)
+  const sortedUpcoming = upcoming.sort((a, b) => {
     if (!a.start_datetime && !b.start_datetime) return 0;
-    if (!a.start_datetime) return 1; // a goes to end
-    if (!b.start_datetime) return -1; // b goes to end
+    if (!a.start_datetime) return 1;
+    if (!b.start_datetime) return -1;
     return new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime();
   });
 
-  // Return only the next 3 upcoming races
-  return sorted.slice(0, 3);
+  // Combine: upcoming first, then ongoing
+  return [...sortedUpcoming, ...ongoing];
 });
 
-const ongoingRaces = computed(() => {
-  return races.value.filter((race) => race.status === 'ONGOING');
+const displayDoneRaces = computed(() => {
+  // Sort done races by created_at DESC (most recent first)
+  return [...doneRaces.value].sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 });
 
-const finishedRaces = computed(() => {
-  return races.value.filter((race) => race.status === 'FINISHED');
-});
+async function loadUpcomingRaces(reset = false) {
+  if (reset) {
+    upcomingOffset.value = 0;
+    upcomingRaces.value = [];
+    hasMoreUpcoming.value = true;
+  }
 
-const canceledRaces = computed(() => {
-  return races.value.filter((race) => race.status === 'CANCELED');
-});
+  if (!hasMoreUpcoming.value) return;
 
-async function loadRaces() {
-  loading.value = true;
+  if (reset) {
+    loadingUpcoming.value = true;
+  } else {
+    loadingMoreUpcoming.value = true;
+  }
   error.value = null;
+
   try {
-    races.value = await getRaces();
-    // Load registrations for all races if authenticated
+    const races = await getUpcomingRaces(PAGE_SIZE, upcomingOffset.value);
+    if (reset) {
+      upcomingRaces.value = races;
+    } else {
+      upcomingRaces.value.push(...races);
+    }
+
+    // Check if there are more races to load
+    hasMoreUpcoming.value = races.length === PAGE_SIZE;
+    upcomingOffset.value += races.length;
+
+    // Load registrations for races if authenticated
     if (props.authenticated && myTeam.value) {
-      await loadRegistrationsForAllRaces();
+      await loadRegistrationsForRaces(races);
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load races';
+    error.value = err instanceof Error ? err.message : 'Failed to load upcoming races';
   } finally {
-    loading.value = false;
+    loadingUpcoming.value = false;
+    loadingMoreUpcoming.value = false;
   }
+}
+
+async function loadDoneRaces(reset = false) {
+  if (reset) {
+    doneOffset.value = 0;
+    doneRaces.value = [];
+    hasMoreDone.value = true;
+  }
+
+  if (!hasMoreDone.value) return;
+
+  if (reset) {
+    loadingDone.value = true;
+  } else {
+    loadingMoreDone.value = true;
+  }
+  error.value = null;
+
+  try {
+    const races = await getDoneRaces(PAGE_SIZE, doneOffset.value);
+    if (reset) {
+      doneRaces.value = races;
+    } else {
+      doneRaces.value.push(...races);
+    }
+
+    // Check if there are more races to load
+    hasMoreDone.value = races.length === PAGE_SIZE;
+    doneOffset.value += races.length;
+
+    // Load registrations for races if authenticated
+    if (props.authenticated && myTeam.value) {
+      await loadRegistrationsForRaces(races);
+    }
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to load done races';
+  } finally {
+    loadingDone.value = false;
+    loadingMoreDone.value = false;
+  }
+}
+
+async function loadRegistrationsForRaces(races: RaceDb[]) {
+  if (!myTeam.value) return;
+
+  // Load registrations for each race in parallel
+  const promises = races.map(async (race) => {
+    try {
+      const regs = await getRaceRegistrations(race.id);
+      const myRegistration = regs.find((r) => r.team_id === myTeam.value!.id);
+      if (myRegistration) {
+        registrations.value.set(race.id, myRegistration);
+      } else {
+        registrations.value.delete(race.id);
+      }
+    } catch (err) {
+      console.error(`Failed to load registrations for race ${race.id}:`, err);
+    }
+  });
+
+  await Promise.all(promises);
 }
 
 async function loadTracks() {
@@ -431,35 +559,14 @@ async function loadMyTeam() {
   }
   try {
     myTeam.value = await getMyTeam();
-    // Load registrations after team is loaded
+    // Reload races to get registrations after team is loaded
     if (myTeam.value) {
-      await loadRegistrationsForAllRaces();
+      await loadUpcomingRaces(true);
+      await loadDoneRaces(true);
     }
   } catch (err) {
     console.error('Failed to load team:', err);
   }
-}
-
-async function loadRegistrationsForAllRaces() {
-  if (!myTeam.value) return;
-
-  // Load registrations for each race in parallel
-  const promises = races.value.map(async (race) => {
-    try {
-      const regs = await getRaceRegistrations(race.id);
-      // Check if our team is registered
-      const myRegistration = regs.find((r) => r.team_id === myTeam.value!.id);
-      if (myRegistration) {
-        registrations.value.set(race.id, myRegistration);
-      } else {
-        registrations.value.delete(race.id);
-      }
-    } catch (err) {
-      console.error(`Failed to load registrations for race ${race.id}:`, err);
-    }
-  });
-
-  await Promise.all(promises);
 }
 
 async function handleRegister(raceId: string) {
@@ -471,8 +578,29 @@ async function handleRegister(raceId: string) {
   registering.value.set(raceId, true);
   try {
     await registerForRace(raceId);
-    // Reload races to get updated status (might have changed to REGISTRATION_CLOSED)
-    await loadRaces();
+
+    // Update registration status locally
+    const registration: RegistrationDb = {
+      id: '', // Not needed for local state
+      race_id: raceId,
+      team_id: myTeam.value.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    registrations.value.set(raceId, registration);
+
+    // Fetch just this race to check if status changed (e.g., REGISTRATION_OPEN -> REGISTRATION_CLOSED)
+    try {
+      const updatedRace = await getRace(raceId);
+      // Update the race in the local array
+      const raceIndex = upcomingRaces.value.findIndex((r) => r.id === raceId);
+      if (raceIndex !== -1) {
+        upcomingRaces.value[raceIndex] = updatedRace;
+      }
+    } catch (err) {
+      console.error('Failed to fetch updated race:', err);
+      // Continue anyway - registration was successful
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to register for race';
   } finally {
@@ -489,8 +617,22 @@ async function handleUnregister(raceId: string) {
   registering.value.set(raceId, true);
   try {
     await unregisterFromRace(raceId);
-    // Reload races to get updated status (might have changed back to REGISTRATION_OPEN)
-    await loadRaces();
+
+    // Remove registration status locally
+    registrations.value.delete(raceId);
+
+    // Fetch just this race to check if status changed (e.g., REGISTRATION_CLOSED -> REGISTRATION_OPEN)
+    try {
+      const updatedRace = await getRace(raceId);
+      // Update the race in the local array
+      const raceIndex = upcomingRaces.value.findIndex((r) => r.id === raceId);
+      if (raceIndex !== -1) {
+        upcomingRaces.value[raceIndex] = updatedRace;
+      }
+    } catch (err) {
+      console.error('Failed to fetch updated race:', err);
+      // Continue anyway - unregistration was successful
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to unregister from race';
   } finally {
@@ -527,8 +669,10 @@ async function handleViewResults(raceId: string) {
   teamsMap.value.clear();
 
   try {
-    // Find the race in the loaded races array
-    const race = races.value.find((r) => r.id === raceId);
+    // Find the race in the loaded races arrays
+    const race =
+      upcomingRaces.value.find((r) => r.id === raceId) ||
+      doneRaces.value.find((r) => r.id === raceId);
     if (race) {
       selectedRace.value = race;
     } else {
@@ -653,7 +797,7 @@ async function handleCreateRace() {
     createSuccess.value = 'Race created successfully!';
     resetForm();
     showCreateForm.value = false;
-    await loadRaces(); // Reload races list
+    await loadUpcomingRaces(true); // Reload upcoming races list
   } catch (err) {
     createError.value = err instanceof Error ? err.message : 'Failed to create race';
   } finally {
@@ -723,7 +867,8 @@ watch(
       // When user becomes authenticated, reload team and registrations
       await loadMyTeam();
       if (myTeam.value) {
-        await loadRaces();
+        await loadUpcomingRaces(true);
+        await loadDoneRaces(true);
       }
     } else {
       // Clear data when logged out
@@ -737,7 +882,8 @@ watch(
 onMounted(async () => {
   await loadTracks();
   await loadMyTeam();
-  await loadRaces();
+  await loadUpcomingRaces(true);
+  await loadDoneRaces(true);
 });
 </script>
 
@@ -1128,6 +1274,13 @@ onMounted(async () => {
   .actions-cell {
     min-width: 150px;
   }
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding: 1rem;
 }
 
 /* Modal Styles */
