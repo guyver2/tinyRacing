@@ -105,6 +105,16 @@
               </div>
             </div>
           </div>
+          <div v-if="drivers.length > 0 && hasMoreDrivers" class="load-more-container">
+            <button
+              class="load-more-button"
+              :disabled="loadingMoreDrivers"
+              @click="loadMoreDrivers"
+            >
+              <span v-if="loadingMoreDrivers">Loading...</span>
+              <span v-else>Load More Drivers</span>
+            </button>
+          </div>
         </section>
 
         <!-- Cars Section -->
@@ -178,6 +188,12 @@
               </div>
             </div>
           </div>
+          <div v-if="cars.length > 0 && hasMoreCars" class="load-more-container">
+            <button class="load-more-button" :disabled="loadingMoreCars" @click="loadMoreCars">
+              <span v-if="loadingMoreCars">Loading...</span>
+              <span v-else>Load More Cars</span>
+            </button>
+          </div>
         </section>
       </div>
     </div>
@@ -196,6 +212,7 @@ import {
   type CarDb,
   type TeamDb,
 } from '@/services/ApiService';
+import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 
 const drivers = ref<DriverDb[]>([]);
 const cars = ref<CarDb[]>([]);
@@ -206,6 +223,18 @@ const expandedCars = ref<Set<string>>(new Set());
 const myTeam = ref<TeamDb | null>(null);
 const buyingDriverId = ref<string | null>(null);
 const buyingCarId = ref<string | null>(null);
+
+// Pagination state for drivers
+const driversLimit = ref(DEFAULT_PAGE_SIZE);
+const driversOffset = ref(0);
+const hasMoreDrivers = ref(false);
+const loadingMoreDrivers = ref(false);
+
+// Pagination state for cars
+const carsLimit = ref(DEFAULT_PAGE_SIZE);
+const carsOffset = ref(0);
+const hasMoreCars = ref(false);
+const loadingMoreCars = ref(false);
 
 function toggleDriver(driverId: string) {
   if (expandedDrivers.value.has(driverId)) {
@@ -443,8 +472,27 @@ async function handleBuyDriver(driver: DriverDb) {
   try {
     const updatedTeam = await buyDriver(driver.id);
     myTeam.value = updatedTeam;
-    // Reload market to remove purchased driver
-    await loadMarket();
+    // Remove purchased driver from list
+    drivers.value = drivers.value.filter((d) => d.id !== driver.id);
+
+    // If there are more drivers available, try to load one more to fill the gap
+    if (hasMoreDrivers.value) {
+      const currentOffset = driversOffset.value;
+      try {
+        const driversData = await getUnassignedDrivers(1, currentOffset);
+        if (driversData.length > 0) {
+          drivers.value = [...drivers.value, ...driversData];
+          driversOffset.value = currentOffset + driversData.length;
+          // We got 1 driver, so if we had more before, we might still have more
+          // (we don't know for sure without checking, but it's likely)
+        } else {
+          hasMoreDrivers.value = false;
+        }
+      } catch (err) {
+        // Silently fail - we already removed the driver
+        console.error('Error loading replacement driver:', err);
+      }
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to buy driver';
     console.error('Error buying driver:', err);
@@ -486,8 +534,27 @@ async function handleBuyCar(car: CarDb) {
   try {
     const updatedTeam = await buyCar(car.id);
     myTeam.value = updatedTeam;
-    // Reload market to remove purchased car
-    await loadMarket();
+    // Remove purchased car from list
+    cars.value = cars.value.filter((c) => c.id !== car.id);
+
+    // If there are more cars available, try to load one more to fill the gap
+    if (hasMoreCars.value) {
+      const currentOffset = carsOffset.value;
+      try {
+        const carsData = await getUnassignedCars(1, currentOffset);
+        if (carsData.length > 0) {
+          cars.value = [...cars.value, ...carsData];
+          carsOffset.value = currentOffset + carsData.length;
+          // We got 1 car, so if we had more before, we might still have more
+          // (we don't know for sure without checking, but it's likely)
+        } else {
+          hasMoreCars.value = false;
+        }
+      } catch (err) {
+        // Silently fail - we already removed the car
+        console.error('Error loading replacement car:', err);
+      }
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to buy car';
     console.error('Error buying car:', err);
@@ -500,21 +567,83 @@ async function loadMarket() {
   loading.value = true;
   error.value = '';
 
+  // Reset pagination when loading market fresh
+  driversOffset.value = 0;
+  hasMoreDrivers.value = false;
+  carsOffset.value = 0;
+  hasMoreCars.value = false;
+
   try {
     const [driversData, carsData, teamData] = await Promise.all([
-      getUnassignedDrivers(),
-      getUnassignedCars(),
+      getUnassignedDrivers(driversLimit.value, driversOffset.value),
+      getUnassignedCars(carsLimit.value, carsOffset.value),
       getMyTeam().catch(() => null), // Don't fail if team doesn't exist
     ]);
 
     drivers.value = driversData;
     cars.value = carsData;
     myTeam.value = teamData;
+
+    // Update offsets to reflect what we've loaded
+    driversOffset.value = driversData.length;
+    carsOffset.value = carsData.length;
+
+    // If we got a full page, there might be more
+    hasMoreDrivers.value = driversData.length === driversLimit.value;
+    hasMoreCars.value = carsData.length === carsLimit.value;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load market';
     console.error('Error loading market:', err);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMoreDrivers() {
+  if (loadingMoreDrivers.value) return;
+
+  loadingMoreDrivers.value = true;
+  error.value = '';
+
+  try {
+    const newOffset = driversOffset.value;
+    const driversData = await getUnassignedDrivers(driversLimit.value, newOffset);
+
+    // Append new drivers to existing list
+    drivers.value = [...drivers.value, ...driversData];
+    driversOffset.value = driversOffset.value + driversData.length;
+
+    // If we got fewer than the limit, there are no more drivers
+    hasMoreDrivers.value = driversData.length === driversLimit.value;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to load more drivers';
+    console.error('Error loading more drivers:', err);
+  } finally {
+    loadingMoreDrivers.value = false;
+  }
+}
+
+async function loadMoreCars() {
+  if (loadingMoreCars.value) return;
+
+  loadingMoreCars.value = true;
+  error.value = '';
+
+  try {
+    const newOffset = carsOffset.value;
+    const carsData = await getUnassignedCars(carsLimit.value, newOffset);
+
+    // Append new cars to existing list
+    cars.value = [...cars.value, ...carsData];
+    carsOffset.value = carsOffset.value + carsData.length;
+
+    // If we got fewer than the limit, there are no more cars
+    hasMoreCars.value = carsData.length === carsLimit.value;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to load more cars';
+    console.error('Error loading more cars:', err);
+  } finally {
+    loadingMoreCars.value = false;
   }
 }
 
@@ -839,6 +968,36 @@ h2 {
 }
 
 .buy-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.load-more-button {
+  padding: 0.75rem 2rem;
+  background-color: #2d4059;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.load-more-button:hover:not(:disabled) {
+  background-color: #1e2a3a;
+}
+
+.load-more-button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
   opacity: 0.7;

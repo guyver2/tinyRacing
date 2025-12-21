@@ -396,10 +396,12 @@ impl RaceState {
             pit_efficiency: team_db.pit_efficiency,
         };
 
-        // Load cars for this team
-        let cars_db = tdb::list_cars_by_team(pool, team_id).await.map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("Failed to load cars: {}", e))
-        })?;
+        // Load cars for this team (max 2, so no need for pagination)
+        let cars_db = tdb::list_cars_by_team(pool, team_id, 100, 0)
+            .await
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Failed to load cars: {}", e))
+            })?;
 
         // For each car, load its driver and create a Car
         for car_db in cars_db {
@@ -560,8 +562,8 @@ impl RaceState {
         })?;
         track.laps = race_db.laps as u32;
 
-        // Load registrations for this race
-        let registrations = tdb::list_registrations_by_race(pool, race_id)
+        // Load registrations for this race (get all, max participants is limited)
+        let registrations = tdb::list_registrations_by_race(pool, race_id, 100, 0)
             .await
             .map_err(|e| {
                 io::Error::new(

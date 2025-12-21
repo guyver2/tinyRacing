@@ -215,9 +215,52 @@ export interface ApiResponse<T> {
   data?: T;
 }
 
+// Pagination parameters interface
+export interface PaginationParams {
+  limit?: number;
+  offset?: number;
+}
+
+// Helper function to build URL with pagination and optional additional parameters
+function buildPaginatedUrl(
+  basePath: string,
+  pagination?: PaginationParams,
+  additionalParams?: Record<string, string>,
+): string {
+  const params = new URLSearchParams();
+
+  // Add pagination parameters
+  if (pagination?.limit !== undefined) {
+    params.append('limit', pagination.limit.toString());
+  }
+  if (pagination?.offset !== undefined) {
+    params.append('offset', pagination.offset.toString());
+  }
+
+  // Add additional parameters
+  if (additionalParams) {
+    for (const [key, value] of Object.entries(additionalParams)) {
+      if (value) {
+        params.append(key, value);
+      }
+    }
+  }
+
+  const queryString = params.toString();
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
 // Get teams (optionally filtered by player_id)
-export async function getTeams(playerId?: string): Promise<TeamDb[]> {
-  const url = playerId ? `/teams?player_id=${playerId}` : '/teams';
+export async function getTeams(
+  playerId?: string,
+  limit?: number,
+  offset?: number,
+): Promise<TeamDb[]> {
+  const url = buildPaginatedUrl(
+    '/teams',
+    { limit, offset },
+    playerId ? { player_id: playerId } : undefined,
+  );
   const response = await apiRequest(url);
 
   if (!response.ok) {
@@ -337,8 +380,9 @@ export interface CarDb {
 }
 
 // Get unassigned drivers (for market)
-export async function getUnassignedDrivers(): Promise<DriverDb[]> {
-  const response = await apiRequest('/drivers/unassigned');
+export async function getUnassignedDrivers(limit?: number, offset?: number): Promise<DriverDb[]> {
+  const url = buildPaginatedUrl('/drivers/unassigned', { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch unassigned drivers: ${response.statusText}`);
@@ -353,8 +397,9 @@ export async function getUnassignedDrivers(): Promise<DriverDb[]> {
 }
 
 // Get unassigned cars (for market)
-export async function getUnassignedCars(): Promise<CarDb[]> {
-  const response = await apiRequest('/cars/unassigned');
+export async function getUnassignedCars(limit?: number, offset?: number): Promise<CarDb[]> {
+  const url = buildPaginatedUrl('/cars/unassigned', { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch unassigned cars: ${response.statusText}`);
@@ -407,8 +452,13 @@ export async function buyCar(carId: string): Promise<TeamDb> {
 }
 
 // Get drivers for a team
-export async function getTeamDrivers(teamId: string): Promise<DriverDb[]> {
-  const response = await apiRequest(`/teams/${teamId}/drivers`);
+export async function getTeamDrivers(
+  teamId: string,
+  limit?: number,
+  offset?: number,
+): Promise<DriverDb[]> {
+  const url = buildPaginatedUrl(`/teams/${teamId}/drivers`, { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch team drivers: ${response.statusText}`);
@@ -423,8 +473,13 @@ export async function getTeamDrivers(teamId: string): Promise<DriverDb[]> {
 }
 
 // Get cars for a team
-export async function getTeamCars(teamId: string): Promise<CarDb[]> {
-  const response = await apiRequest(`/teams/${teamId}/cars`);
+export async function getTeamCars(
+  teamId: string,
+  limit?: number,
+  offset?: number,
+): Promise<CarDb[]> {
+  const url = buildPaginatedUrl(`/teams/${teamId}/cars`, { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch team cars: ${response.statusText}`);
@@ -471,8 +526,9 @@ export interface TrackDb {
 }
 
 // Get all tracks
-export async function getTracks(): Promise<TrackDb[]> {
-  const response = await apiRequest('/tracks');
+export async function getTracks(limit?: number, offset?: number): Promise<TrackDb[]> {
+  const url = buildPaginatedUrl('/tracks', { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch tracks: ${response.statusText}`);
@@ -508,8 +564,9 @@ export interface CreateRaceRequest {
 }
 
 // Get all races
-export async function getRaces(): Promise<RaceDb[]> {
-  const response = await apiRequest('/races');
+export async function getRaces(limit?: number, offset?: number): Promise<RaceDb[]> {
+  const url = buildPaginatedUrl('/races', { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch races: ${response.statusText}`);
@@ -622,8 +679,13 @@ export async function startRaceNow(raceId: string): Promise<void> {
 }
 
 // Get registrations for a race
-export async function getRaceRegistrations(raceId: string): Promise<RegistrationDb[]> {
-  const response = await apiRequest(`/races/${raceId}/registrations`);
+export async function getRaceRegistrations(
+  raceId: string,
+  limit?: number,
+  offset?: number,
+): Promise<RegistrationDb[]> {
+  const url = buildPaginatedUrl(`/races/${raceId}/registrations`, { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch registrations: ${response.statusText}`);
@@ -652,8 +714,13 @@ export interface RegistrationWithRaceDetails {
 }
 
 // Get registrations for a team (with race details)
-export async function getTeamRegistrations(teamId: string): Promise<RegistrationWithRaceDetails[]> {
-  const response = await apiRequest(`/teams/${teamId}/registrations`);
+export async function getTeamRegistrations(
+  teamId: string,
+  limit?: number,
+  offset?: number,
+): Promise<RegistrationWithRaceDetails[]> {
+  const url = buildPaginatedUrl(`/teams/${teamId}/registrations`, { limit, offset });
+  const response = await apiRequest(url);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch team registrations: ${response.statusText}`);

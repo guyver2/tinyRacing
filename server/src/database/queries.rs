@@ -74,10 +74,17 @@ pub async fn get_team_by_number(pool: &PgPool, number: i32) -> Result<Option<Tea
     Ok(team)
 }
 
-pub async fn list_teams(pool: &PgPool) -> Result<Vec<TeamDb>, sqlx::Error> {
-    let teams = sqlx::query_as::<_, TeamDb>("SELECT * FROM team ORDER BY number")
-        .fetch_all(pool)
-        .await?;
+pub async fn list_teams(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<TeamDb>, sqlx::Error> {
+    let teams =
+        sqlx::query_as::<_, TeamDb>("SELECT * FROM team ORDER BY number LIMIT $1 OFFSET $2")
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
     Ok(teams)
 }
@@ -85,12 +92,17 @@ pub async fn list_teams(pool: &PgPool) -> Result<Vec<TeamDb>, sqlx::Error> {
 pub async fn list_teams_by_player(
     pool: &PgPool,
     player_id: Uuid,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<TeamDb>, sqlx::Error> {
-    let teams =
-        sqlx::query_as::<_, TeamDb>("SELECT * FROM team WHERE player_id = $1 ORDER BY number")
-            .bind(player_id)
-            .fetch_all(pool)
-            .await?;
+    let teams = sqlx::query_as::<_, TeamDb>(
+        "SELECT * FROM team WHERE player_id = $1 ORDER BY number LIMIT $2 OFFSET $3",
+    )
+    .bind(player_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
 
     Ok(teams)
 }
@@ -253,19 +265,32 @@ pub async fn get_driver_by_first_and_last_name(
     Ok(driver)
 }
 
-pub async fn list_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
-    let drivers =
-        sqlx::query_as::<_, DriverDb>("SELECT * FROM driver ORDER BY last_name, first_name")
-            .fetch_all(pool)
-            .await?;
+pub async fn list_drivers(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DriverDb>, sqlx::Error> {
+    let drivers = sqlx::query_as::<_, DriverDb>(
+        "SELECT * FROM driver ORDER BY last_name, first_name LIMIT $1 OFFSET $2",
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
 
     Ok(drivers)
 }
 
-pub async fn list_unassigned_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sqlx::Error> {
+pub async fn list_unassigned_drivers(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DriverDb>, sqlx::Error> {
     let drivers = sqlx::query_as::<_, DriverDb>(
-        "SELECT * FROM driver WHERE team_id IS NULL ORDER BY last_name, first_name",
+        "SELECT * FROM driver WHERE team_id IS NULL ORDER BY last_name, first_name LIMIT $1 OFFSET $2",
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
 
@@ -275,11 +300,15 @@ pub async fn list_unassigned_drivers(pool: &PgPool) -> Result<Vec<DriverDb>, sql
 pub async fn list_drivers_by_team(
     pool: &PgPool,
     team_id: Uuid,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<DriverDb>, sqlx::Error> {
     let drivers = sqlx::query_as::<_, DriverDb>(
-        "SELECT * FROM driver WHERE team_id = $1 ORDER BY last_name, first_name",
+        "SELECT * FROM driver WHERE team_id = $1 ORDER BY last_name, first_name LIMIT $2 OFFSET $3",
     )
     .bind(team_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
 
@@ -415,28 +444,46 @@ pub async fn get_car_by_number(pool: &PgPool, number: i32) -> Result<Option<CarD
     Ok(car)
 }
 
-pub async fn list_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
-    let cars = sqlx::query_as::<_, CarDb>("SELECT * FROM car ORDER BY number")
+pub async fn list_cars(pool: &PgPool, limit: i64, offset: i64) -> Result<Vec<CarDb>, sqlx::Error> {
+    let cars = sqlx::query_as::<_, CarDb>("SELECT * FROM car ORDER BY number LIMIT $1 OFFSET $2")
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await?;
 
     Ok(cars)
 }
 
-pub async fn list_unassigned_cars(pool: &PgPool) -> Result<Vec<CarDb>, sqlx::Error> {
-    let cars =
-        sqlx::query_as::<_, CarDb>("SELECT * FROM car WHERE team_id IS NULL ORDER BY number")
-            .fetch_all(pool)
-            .await?;
+pub async fn list_unassigned_cars(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<CarDb>, sqlx::Error> {
+    let cars = sqlx::query_as::<_, CarDb>(
+        "SELECT * FROM car WHERE team_id IS NULL ORDER BY number LIMIT $1 OFFSET $2",
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
 
     Ok(cars)
 }
 
-pub async fn list_cars_by_team(pool: &PgPool, team_id: Uuid) -> Result<Vec<CarDb>, sqlx::Error> {
-    let cars = sqlx::query_as::<_, CarDb>("SELECT * FROM car WHERE team_id = $1 ORDER BY number")
-        .bind(team_id)
-        .fetch_all(pool)
-        .await?;
+pub async fn list_cars_by_team(
+    pool: &PgPool,
+    team_id: Uuid,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<CarDb>, sqlx::Error> {
+    let cars = sqlx::query_as::<_, CarDb>(
+        "SELECT * FROM car WHERE team_id = $1 ORDER BY number LIMIT $2 OFFSET $3",
+    )
+    .bind(team_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
 
     Ok(cars)
 }
@@ -556,10 +603,17 @@ pub async fn get_track_by_track_id(
     Ok(track)
 }
 
-pub async fn list_tracks(pool: &PgPool) -> Result<Vec<TrackDb>, sqlx::Error> {
-    let tracks = sqlx::query_as::<_, TrackDb>("SELECT * FROM track ORDER BY name")
-        .fetch_all(pool)
-        .await?;
+pub async fn list_tracks(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<TrackDb>, sqlx::Error> {
+    let tracks =
+        sqlx::query_as::<_, TrackDb>("SELECT * FROM track ORDER BY name LIMIT $1 OFFSET $2")
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
     Ok(tracks)
 }
@@ -645,10 +699,17 @@ pub async fn get_player_by_username(
     Ok(player)
 }
 
-pub async fn list_players(pool: &PgPool) -> Result<Vec<PlayerDb>, sqlx::Error> {
-    let players = sqlx::query_as::<_, PlayerDb>("SELECT * FROM player ORDER BY username")
-        .fetch_all(pool)
-        .await?;
+pub async fn list_players(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<PlayerDb>, sqlx::Error> {
+    let players =
+        sqlx::query_as::<_, PlayerDb>("SELECT * FROM player ORDER BY username LIMIT $1 OFFSET $2")
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
     Ok(players)
 }
@@ -725,10 +786,16 @@ pub async fn get_race_by_id(pool: &PgPool, id: Uuid) -> Result<Option<RaceDb>, s
     Ok(race)
 }
 
-pub async fn list_races(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+pub async fn list_races(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<RaceDb>, sqlx::Error> {
     let races = sqlx::query_as::<_, RaceDb>(
-        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY created_at DESC"
+        "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY created_at DESC LIMIT $1 OFFSET $2"
     )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await?;
 
@@ -804,11 +871,15 @@ pub async fn get_registration(
 pub async fn list_registrations_by_race(
     pool: &PgPool,
     race_id: Uuid,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<RegistrationDb>, sqlx::Error> {
     let registrations = sqlx::query_as::<_, RegistrationDb>(
-        "SELECT * FROM registration WHERE race_id = $1 ORDER BY created_at",
+        "SELECT * FROM registration WHERE race_id = $1 ORDER BY created_at LIMIT $2 OFFSET $3",
     )
     .bind(race_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
 
@@ -847,6 +918,8 @@ pub struct RegistrationWithRaceDetails {
 pub async fn list_registrations_with_race_details_by_team(
     pool: &PgPool,
     team_id: Uuid,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<RegistrationWithRaceDetails>, sqlx::Error> {
     let registrations = sqlx::query_as::<_, RegistrationWithRaceDetails>(
         r#"
@@ -867,9 +940,12 @@ pub async fn list_registrations_with_race_details_by_team(
         WHERE r.team_id = $1
         ORDER BY 
             COALESCE(race.start_datetime, race.created_at) ASC
+        LIMIT $2 OFFSET $3
         "#,
     )
     .bind(team_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
 

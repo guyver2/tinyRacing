@@ -26,6 +26,7 @@ use crate::database::{finish_race, init_from_env, Database};
 mod api;
 mod auth;
 mod auth_middleware;
+mod constants;
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;

@@ -147,6 +147,26 @@ struct PitStopRequest {
 #[derive(Deserialize)]
 struct TeamQueryParams {
     player_id: Option<String>,
+    #[serde(default = "default_limit")]
+    limit: i64,
+    #[serde(default = "default_offset")]
+    offset: i64,
+}
+
+#[derive(Deserialize)]
+struct PaginationParams {
+    #[serde(default = "default_limit")]
+    limit: i64,
+    #[serde(default = "default_offset")]
+    offset: i64,
+}
+
+fn default_limit() -> i64 {
+    crate::constants::DEFAULT_PAGE_SIZE
+}
+
+fn default_offset() -> i64 {
+    0
 }
 
 // Implementation of response conversion for ApiError
@@ -294,20 +314,6 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         .route("/players/{player_id}", get(get_player))
         // create routes
         .route("/teams", post(create_team_handler))
-        // .route("/drivers", post(create_driver))
-        // .route("/cars", post(create_car))
-        // .route("/tracks", post(create_track))
-        //.route("/players", post(create_player)) // players are created through register
-        // update routes
-        // .route("/teams/{team_id}", put(update_team))
-        // .route("/drivers/{driver_id}", put(update_driver))
-        // .route("/cars/{car_id}", put(update_car))
-        // .route("/tracks/{track_id}", put(update_track))
-        // delete routes
-        // .route("/teams/{team_id}", delete(delete_team))
-        // .route("/drivers/{driver_id}", delete(delete_driver))
-        // .route("/cars/{car_id}", delete(delete_car))
-        // .route("/tracks/{track_id}", delete(delete_track))
         // Race control routes
         .route("/race/{race_id}", get(get_race_status))
         .route("/race/{race_id}/start", post(start_race))
@@ -362,11 +368,11 @@ async fn get_teams(
         let player_id = Uuid::parse_str(&player_id_str).map_err(|_| {
             ApiError::BadRequest(format!("Invalid player ID format: {}", player_id_str))
         })?;
-        tdb::list_teams_by_player(pool, player_id)
+        tdb::list_teams_by_player(pool, player_id, params.limit, params.offset)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
     } else {
-        tdb::list_teams(pool)
+        tdb::list_teams(pool, params.limit, params.offset)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch teams: {}", e)))?
     };
@@ -638,12 +644,13 @@ async fn create_team_handler(
 // Get all drivers
 async fn get_drivers(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<DriverResponse>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let drivers = tdb::list_drivers(pool)
+    let drivers = tdb::list_drivers(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
 
@@ -660,14 +667,17 @@ async fn get_drivers(
 // Get unassigned drivers (for market)
 async fn get_unassigned_drivers(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<DriverResponse>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let drivers = tdb::list_unassigned_drivers(pool).await.map_err(|e| {
-        ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e))
-    })?;
+    let drivers = tdb::list_unassigned_drivers(pool, params.limit, params.offset)
+        .await
+        .map_err(|e| {
+            ApiError::InternalError(format!("Failed to fetch unassigned drivers: {}", e))
+        })?;
 
     // Convert each driver to DriverResponse with avatar
     let mut drivers_with_avatars = Vec::new();
@@ -993,7 +1003,8 @@ async fn assign_driver_car(
 
     // If assigning to a car, check if another driver is already assigned to it
     if let Some(car_uuid_val) = car_uuid {
-        let drivers_with_car = tdb::list_drivers_by_team(pool, team.id)
+        // Get all drivers for the team (max 4, so no need for pagination)
+        let drivers_with_car = tdb::list_drivers_by_team(pool, team.id, 100, 0)
             .await
             .map_err(|e| ApiError::InternalError(format!("Failed to fetch drivers: {}", e)))?;
 
@@ -1032,12 +1043,13 @@ async fn assign_driver_car(
 // Get all cars
 async fn get_cars(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::CarDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let cars = tdb::list_cars(pool)
+    let cars = tdb::list_cars(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch cars: {}", e)))?;
 
@@ -1047,12 +1059,13 @@ async fn get_cars(
 // Get unassigned cars (for market)
 async fn get_unassigned_cars(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::CarDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let cars = tdb::list_unassigned_cars(pool)
+    let cars = tdb::list_unassigned_cars(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch unassigned cars: {}", e)))?;
 
@@ -1083,6 +1096,7 @@ async fn get_car(
 async fn get_team_drivers(
     Path(team_id): Path<String>,
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<DriverResponse>>>> {
     let pool = state
         .db_pool
@@ -1091,7 +1105,7 @@ async fn get_team_drivers(
     let uuid = Uuid::parse_str(&team_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
-    let drivers = tdb::list_drivers_by_team(pool, uuid)
+    let drivers = tdb::list_drivers_by_team(pool, uuid, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team drivers: {}", e)))?;
 
@@ -1109,6 +1123,7 @@ async fn get_team_drivers(
 async fn get_team_cars(
     Path(team_id): Path<String>,
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::CarDb>>>> {
     let pool = state
         .db_pool
@@ -1117,7 +1132,7 @@ async fn get_team_cars(
     let uuid = Uuid::parse_str(&team_id)
         .map_err(|_| ApiError::BadRequest(format!("Invalid team ID format: {}", team_id)))?;
 
-    let cars = tdb::list_cars_by_team(pool, uuid)
+    let cars = tdb::list_cars_by_team(pool, uuid, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch team cars: {}", e)))?;
 
@@ -1127,12 +1142,13 @@ async fn get_team_cars(
 // Get all tracks
 async fn get_tracks(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::TrackDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let tracks = tdb::list_tracks(pool)
+    let tracks = tdb::list_tracks(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch tracks: {}", e)))?;
 
@@ -1162,12 +1178,13 @@ async fn get_track(
 // Get all players
 async fn get_players(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::PlayerDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let players = tdb::list_players(pool)
+    let players = tdb::list_players(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch players: {}", e)))?;
 
@@ -1197,12 +1214,13 @@ async fn get_player(
 // Get all races
 async fn get_races(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::RaceDb>>>> {
     let pool = state
         .db_pool
         .as_ref()
         .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
-    let races = tdb::list_races(pool)
+    let races = tdb::list_races(pool, params.limit, params.offset)
         .await
         .map_err(|e| ApiError::InternalError(format!("Failed to fetch races: {}", e)))?;
 
@@ -1528,6 +1546,7 @@ async fn unregister_from_race(
 async fn get_race_registrations(
     Path(race_id): Path<String>,
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::RegistrationDb>>>> {
     let pool = state
         .db_pool
@@ -1545,9 +1564,12 @@ async fn get_race_registrations(
         .ok_or_else(|| ApiError::NotFound(format!("Race with ID {} not found", race_id)))?;
 
     // Get registrations
-    let registrations = crate::database::list_registrations_by_race(pool, race_uuid)
-        .await
-        .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
+    let registrations =
+        crate::database::list_registrations_by_race(pool, race_uuid, params.limit, params.offset)
+            .await
+            .map_err(|e| {
+                ApiError::InternalError(format!("Failed to fetch registrations: {}", e))
+            })?;
 
     Ok(success(Some(registrations), None))
 }
@@ -1556,6 +1578,7 @@ async fn get_race_registrations(
 async fn get_team_registrations(
     Path(team_id): Path<String>,
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> ApiResult<Json<ApiResponse<Vec<crate::database::RegistrationWithRaceDetails>>>> {
     let pool = state
         .db_pool
@@ -1573,9 +1596,14 @@ async fn get_team_registrations(
         .ok_or_else(|| ApiError::NotFound(format!("Team with ID {} not found", team_id)))?;
 
     // Get registrations with race details
-    let registrations = tdb::list_registrations_with_race_details_by_team(pool, team_uuid)
-        .await
-        .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
+    let registrations = tdb::list_registrations_with_race_details_by_team(
+        pool,
+        team_uuid,
+        params.limit,
+        params.offset,
+    )
+    .await
+    .map_err(|e| ApiError::InternalError(format!("Failed to fetch registrations: {}", e)))?;
 
     Ok(success(Some(registrations), None))
 }
