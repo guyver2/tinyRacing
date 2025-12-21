@@ -363,10 +363,22 @@ const substituteDrivers = computed(() => {
 
 // Filter races to only show non-started races (REGISTRATION_OPEN or REGISTRATION_CLOSED)
 const upcomingRaces = computed(() => {
-  return registeredRaces.value.filter(
+  const filtered = registeredRaces.value.filter(
     (race) =>
       race.race_status === 'REGISTRATION_OPEN' || race.race_status === 'REGISTRATION_CLOSED',
   );
+
+  // Sort chronologically by start_datetime (earliest first)
+  // Races without start_datetime go to the end
+  const sorted = filtered.sort((a, b) => {
+    if (!a.start_datetime && !b.start_datetime) return 0;
+    if (!a.start_datetime) return 1; // a goes to end
+    if (!b.start_datetime) return -1; // b goes to end
+    return new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime();
+  });
+
+  // Return only the next 3 upcoming races
+  return sorted.slice(0, 3);
 });
 
 // Helper function to get driver for a car

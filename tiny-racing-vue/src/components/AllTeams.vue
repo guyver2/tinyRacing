@@ -314,10 +314,22 @@ function getDriverForCar(car: CarDb): DriverDb | undefined {
 // Filter races to only show non-started races (REGISTRATION_OPEN or REGISTRATION_CLOSED)
 const upcomingRacesForExpandedTeam = computed(() => {
   if (!expandedTeamData.value) return [];
-  return expandedTeamData.value.registeredRaces.filter(
+  const filtered = expandedTeamData.value.registeredRaces.filter(
     (race) =>
       race.race_status === 'REGISTRATION_OPEN' || race.race_status === 'REGISTRATION_CLOSED',
   );
+
+  // Sort chronologically by start_datetime (earliest first)
+  // Races without start_datetime go to the end
+  const sorted = filtered.sort((a, b) => {
+    if (!a.start_datetime && !b.start_datetime) return 0;
+    if (!a.start_datetime) return 1; // a goes to end
+    if (!b.start_datetime) return -1; // b goes to end
+    return new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime();
+  });
+
+  // Return only the next 3 upcoming races
+  return sorted.slice(0, 3);
 });
 
 async function loadTeams() {
