@@ -190,44 +190,15 @@
                           }}</span>
                         </div>
                       </div>
-                      <div class="driver-stats">
-                        <div class="stat-row">
-                          <span class="stat-label">Skill:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.skill_level.toFixed(1)
-                          }}</span>
-                        </div>
-                        <div class="stat-row">
-                          <span class="stat-label">Stamina:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.stamina.toFixed(1)
-                          }}</span>
-                        </div>
-                        <div class="stat-row">
-                          <span class="stat-label">Experience:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.experience.toFixed(1)
-                          }}</span>
-                        </div>
-                        <div class="stat-row">
-                          <span class="stat-label">Consistency:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.consistency.toFixed(1)
-                          }}</span>
-                        </div>
-                        <div class="stat-row">
-                          <span class="stat-label">Focus:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.focus.toFixed(1)
-                          }}</span>
-                        </div>
-                        <div class="stat-row">
-                          <span class="stat-label">Weather:</span>
-                          <span class="stat-value">{{
-                            getDriverForCar(car)?.weather_tolerance.toFixed(1)
-                          }}</span>
-                        </div>
-                      </div>
+                      <DriverStatsRadarChart
+                        v-if="getDriverForCar(car)"
+                        :skill-level="getDriverForCar(car)!.skill_level"
+                        :stamina="getDriverForCar(car)!.stamina"
+                        :experience="getDriverForCar(car)!.experience"
+                        :consistency="getDriverForCar(car)!.consistency"
+                        :focus="getDriverForCar(car)!.focus"
+                        :weather-tolerance="getDriverForCar(car)!.weather_tolerance"
+                      />
                     </div>
                     <div v-else class="empty-slot">
                       <p>Drop a driver here</p>
@@ -260,32 +231,14 @@
                         <span class="driver-nationality">{{ subDriver.nationality }}</span>
                       </div>
                     </div>
-                    <div class="driver-stats">
-                      <div class="stat-row">
-                        <span class="stat-label">Skill:</span>
-                        <span class="stat-value">{{ subDriver.skill_level.toFixed(1) }}</span>
-                      </div>
-                      <div class="stat-row">
-                        <span class="stat-label">Stamina:</span>
-                        <span class="stat-value">{{ subDriver.stamina.toFixed(1) }}</span>
-                      </div>
-                      <div class="stat-row">
-                        <span class="stat-label">Experience:</span>
-                        <span class="stat-value">{{ subDriver.experience.toFixed(1) }}</span>
-                      </div>
-                      <div class="stat-row">
-                        <span class="stat-label">Consistency:</span>
-                        <span class="stat-value">{{ subDriver.consistency.toFixed(1) }}</span>
-                      </div>
-                      <div class="stat-row">
-                        <span class="stat-label">Focus:</span>
-                        <span class="stat-value">{{ subDriver.focus.toFixed(1) }}</span>
-                      </div>
-                      <div class="stat-row">
-                        <span class="stat-label">Weather:</span>
-                        <span class="stat-value">{{ subDriver.weather_tolerance.toFixed(1) }}</span>
-                      </div>
-                    </div>
+                    <DriverStatsRadarChart
+                      :skill-level="subDriver.skill_level"
+                      :stamina="subDriver.stamina"
+                      :experience="subDriver.experience"
+                      :consistency="subDriver.consistency"
+                      :focus="subDriver.focus"
+                      :weather-tolerance="subDriver.weather_tolerance"
+                    />
                   </div>
                 </div>
               </div>
@@ -319,6 +272,7 @@ import {
   type CarDb,
   type RegistrationWithRaceDetails,
 } from '@/services/ApiService';
+import DriverStatsRadarChart from './DriverStatsRadarChart.vue';
 
 const props = defineProps<{
   authenticated: boolean;
