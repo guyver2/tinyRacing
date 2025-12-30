@@ -9,8 +9,8 @@
       <!-- Error state -->
       <div v-if="error" class="error-message">{{ error }}</div>
 
-      <!-- Create team form (shown when user has no team) -->
-      <div v-if="!loading && !error && !team" class="create-team-section">
+      <!-- Create team form (shown when user has no team and on my-team route) -->
+      <div v-if="!loading && !error && !team && isMyTeamRoute" class="create-team-section">
         <div class="create-team-form">
           <h3>Create Your First Team</h3>
           <p class="form-description">You don't have any teams yet. Create one to get started!</p>
@@ -107,6 +107,7 @@
                   <div class="race-card-line-2">
                     <span class="race-date">{{ formatRaceDate(raceReg.start_datetime) }}</span>
                     <button
+                      v-if="isEditable"
                       @click="handleUnregisterFromRace(raceReg.race_id)"
                       class="btn-unregister"
                       :disabled="unregisteringRaceId === raceReg.race_id"
@@ -131,9 +132,9 @@
                     :key="car.id"
                     class="car-slot"
                     :class="{ 'has-driver': getDriverForCar(car) }"
-                    @drop="handleDrop($event, car.id)"
-                    @dragover.prevent
-                    @dragenter.prevent
+                    @drop="isEditable ? handleDrop($event, car.id) : undefined"
+                    @dragover.prevent="isEditable"
+                    @dragenter.prevent="isEditable"
                   >
                     <div class="car-header">
                       <h5>Car #{{ car.number }}</h5>
@@ -166,6 +167,7 @@
                     </div>
                     <div v-if="getDriverForCar(car)" class="driver-assigned">
                       <button
+                        v-if="isEditable"
                         class="unseat-button"
                         @click="handleUnseat(getDriverForCar(car)!.id)"
                         :disabled="unseatingDriverId === getDriverForCar(car)?.id"
@@ -201,7 +203,8 @@
                       />
                     </div>
                     <div v-else class="empty-slot">
-                      <p>Drop a driver here</p>
+                      <p v-if="isEditable">Drop a driver here</p>
+                      <p v-else>No driver assigned</p>
                     </div>
                   </div>
                 </div>
@@ -215,7 +218,7 @@
                     v-for="subDriver in substituteDrivers"
                     :key="subDriver.id"
                     class="sub-driver-card"
-                    draggable="true"
+                    :draggable="isEditable"
                     @dragstart="handleDragStart($event, subDriver.id)"
                     @dragend="handleDragEnd"
                   >
@@ -258,14 +261,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   getMyTeam,
+  getTeam,
   createTeam,
   getTeamDrivers,
   getTeamCars,
   assignDriverToCar,
   getTeamRegistrations,
   unregisterFromRace,
+  getPlayerId,
   type TeamDb,
   type CreateTeamRequest,
   type DriverDb,
@@ -274,9 +280,33 @@ import {
 } from '@/services/ApiService';
 import DriverStatsRadarChart from './DriverStatsRadarChart.vue';
 
+const route = useRoute();
 const props = defineProps<{
-  authenticated: boolean;
+  authenticated?: boolean;
+  teamId?: string;
 }>();
+
+// Get teamId from route params if not provided as prop
+const teamId = computed(() => {
+  return props.teamId || (route.params.teamId as string) || null;
+});
+
+// Check if we're on the "my-team" route (not viewing a specific team by ID)
+const isMyTeamRoute = computed(() => {
+  return route.name === 'my-team';
+});
+
+// Check if the current team belongs to the logged-in user
+const isMyTeam = computed(() => {
+  if (!team.value || !props.authenticated) return false;
+  const currentPlayerId = getPlayerId();
+  return currentPlayerId !== null && team.value.player_id === currentPlayerId;
+});
+
+// Determine if controls should be editable (only if it's the user's own team)
+const isEditable = computed(() => {
+  return isMyTeam.value;
+});
 
 const team = ref<TeamDb | null>(null);
 const loading = ref(true);
@@ -409,9 +439,27 @@ async function loadTeam() {
   error.value = '';
 
   try {
-    team.value = await getMyTeam();
-    if (team.value) {
-      await Promise.all([loadLineup(team.value.id), loadRegistrations(team.value.id)]);
+    // If teamId is provided (viewing specific team via route), use getTeam
+    // Otherwise, if on my-team route, get current user's team
+    if (teamId.value) {
+      // Viewing a specific team by ID
+      team.value = await getTeam(teamId.value);
+      if (team.value) {
+        await Promise.all([loadLineup(team.value.id), loadRegistrations(team.value.id)]);
+      }
+    } else if (isMyTeamRoute.value) {
+      // On /my-team route, load user's team
+      if (props.authenticated) {
+        team.value = await getMyTeam();
+        if (team.value) {
+          await Promise.all([loadLineup(team.value.id), loadRegistrations(team.value.id)]);
+        }
+      } else {
+        loading.value = false;
+      }
+    } else {
+      // No team to load
+      loading.value = false;
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load team';
@@ -569,11 +617,11 @@ async function handleCreateTeam() {
 watch(
   () => props.authenticated,
   (newAuth) => {
-    if (newAuth) {
-      // User just logged in, reload team data
+    if (newAuth && isMyTeamRoute.value) {
+      // User just logged in, reload team data (only if on my-team route)
       loadTeam();
-    } else {
-      // User logged out, clear team data
+    } else if (!newAuth && isMyTeamRoute.value) {
+      // User logged out, clear team data (only if on my-team route)
       team.value = null;
       drivers.value = [];
       cars.value = [];
@@ -584,13 +632,16 @@ watch(
   },
 );
 
-onMounted(() => {
-  // Only load team if authenticated
-  if (props.authenticated) {
+// Watch for route changes (teamId or route name changes)
+watch(
+  () => [teamId.value, route.name],
+  () => {
     loadTeam();
-  } else {
-    loading.value = false;
-  }
+  },
+);
+
+onMounted(() => {
+  loadTeam();
 });
 </script>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 
 const props = defineProps<{
   authenticated: boolean;
@@ -13,6 +14,9 @@ const emit = defineEmits<{
   (e: 'logout'): void;
 }>();
 
+const router = useRouter();
+const route = useRoute();
+
 const navigationLinks = computed(() => [
   { name: 'Game', view: 'game', requiresAuth: false },
   { name: 'My Team', view: 'my-team', requiresAuth: true },
@@ -25,7 +29,15 @@ const visibleLinks = computed(() =>
   navigationLinks.value.filter((link) => !link.requiresAuth || props.authenticated),
 );
 
+// Check if a route is active (handles both exact matches and parameterized routes)
+const isRouteActive = (viewName: string) => {
+  const routeName = route.name as string;
+  // Only match exact route names - don't confuse 'my-team' with 'team'
+  return routeName === viewName;
+};
+
 function handleNavigate(view: string) {
+  router.push({ name: view });
   emit('navigate', view);
 }
 
@@ -50,7 +62,7 @@ function handleLogout() {
         <button
           v-for="link in visibleLinks"
           :key="link.view"
-          :class="['nav-link', { active: currentView === link.view }]"
+          :class="['nav-link', { active: isRouteActive(link.view) }]"
           @click="handleNavigate(link.view)"
         >
           {{ link.name }}

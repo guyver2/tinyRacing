@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import RaceHeader from './RaceHeader.vue';
 import CarsTable from './CarsTable.vue';
 import TrackVisualizer from './TrackVisualizer.vue';
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   navigate: [view: string];
 }>();
 
+const router = useRouter();
 const { raceState, connected } = useRaceData();
 const isCarTableCollapsed = ref(true);
 
@@ -40,6 +42,7 @@ const playerCars = computed(() => {
 });
 
 function navigateToRaces() {
+  router.push({ name: 'races' });
   emit('navigate', 'races');
 }
 </script>

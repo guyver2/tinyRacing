@@ -1,59 +1,62 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import AppHeader from './components/AppHeader.vue';
-import Game from './components/game.vue';
-import LoginForm from './components/LoginForm.vue';
-import RegisterForm from './components/RegisterForm.vue';
-import Team from './components/Team.vue';
-import AllTeams from './components/AllTeams.vue';
-import Market from './components/Market.vue';
-import Races from './components/Races.vue';
 import { isAuthenticated, logout } from './services/ApiService';
 
+const router = useRouter();
+const route = useRoute();
+
 const authenticated = ref(false);
-const currentView = ref('game');
 
 function checkAuth() {
   authenticated.value = isAuthenticated();
 }
 
 function handleNavigate(view: string) {
-  currentView.value = view;
+  router.push({ name: view });
   // Re-check auth when navigating to ensure state is up to date
   checkAuth();
 }
 
 function handleLoginSuccess() {
   authenticated.value = true;
-  currentView.value = 'game';
+  router.push({ name: 'game' });
 }
 
 function handleRegisterSuccess() {
   // Switch to login view after successful registration
-  currentView.value = 'login';
+  router.push({ name: 'login' });
 }
 
 async function handleLogout() {
   await logout();
   authenticated.value = false;
   // Redirect to initial game view if not already on it
-  if (currentView.value !== 'game') {
-    currentView.value = 'game';
+  if (route.name !== 'game') {
+    router.push({ name: 'game' });
   }
 }
 
 function showLogin() {
-  currentView.value = 'login';
+  router.push({ name: 'login' });
 }
 
 function showRegister() {
-  currentView.value = 'register';
+  router.push({ name: 'register' });
 }
 
-// Watch for view changes and re-check auth to keep state synchronized
-watch(currentView, () => {
-  checkAuth();
+const currentView = computed(() => {
+  return (route.name as string) || 'game';
 });
+
+// Watch for route changes and re-check auth to keep state synchronized
+watch(
+  () => route.name,
+  () => {
+    checkAuth();
+  },
+);
 
 onMounted(() => {
   checkAuth();
@@ -74,44 +77,15 @@ onMounted(() => {
 
     <!-- Main content area -->
     <main class="main-content" :class="{ 'no-overflow': currentView === 'game' }">
-      <!-- Game view -->
-      <div v-show="currentView === 'game'" class="view">
-        <Game @navigate="handleNavigate" />
-      </div>
-
-      <!-- Team view -->
-      <div v-show="currentView === 'my-team'" class="view">
-        <Team :authenticated="authenticated" />
-      </div>
-
-      <!-- All Teams view -->
-      <div v-show="currentView === 'all-teams'" class="view">
-        <AllTeams />
-      </div>
-
-      <!-- Market view -->
-      <div v-show="currentView === 'market'" class="view market-view">
-        <Market />
-      </div>
-
-      <!-- Races view -->
-      <div v-show="currentView === 'races'" class="view races-view">
-        <Races :authenticated="authenticated" @navigate="handleNavigate" />
-      </div>
-
-      <!-- Login view -->
-      <div v-show="currentView === 'login'" class="view">
-        <div class="form-view">
-          <LoginForm @login-success="handleLoginSuccess" />
-        </div>
-      </div>
-
-      <!-- Register view -->
-      <div v-show="currentView === 'register'" class="view">
-        <div class="form-view">
-          <RegisterForm @register-success="handleRegisterSuccess" />
-        </div>
-      </div>
+      <router-view v-slot="{ Component }">
+        <component
+          :is="Component"
+          :authenticated="authenticated"
+          @navigate="handleNavigate"
+          @login-success="handleLoginSuccess"
+          @register-success="handleRegisterSuccess"
+        />
+      </router-view>
     </main>
   </div>
 </template>

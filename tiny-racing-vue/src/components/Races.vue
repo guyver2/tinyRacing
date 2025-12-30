@@ -312,26 +312,36 @@
                         </div>
                       </td>
                       <td>
-                        <div class="driver-cell">
-                          <img
-                            v-if="getDriverAvatar(result.driver_id)"
-                            :src="getDriverAvatar(result.driver_id) || ''"
-                            :alt="getDriverName(result.driver_id)"
-                            class="driver-avatar"
-                          />
-                          <span>{{ getDriverName(result.driver_id) }}</span>
-                        </div>
+                        <router-link
+                          :to="{ name: 'driver', params: { driverId: result.driver_id } }"
+                          class="driver-cell-link"
+                        >
+                          <div class="driver-cell">
+                            <img
+                              v-if="getDriverAvatar(result.driver_id)"
+                              :src="getDriverAvatar(result.driver_id) || ''"
+                              :alt="getDriverName(result.driver_id)"
+                              class="driver-avatar"
+                            />
+                            <span>{{ getDriverName(result.driver_id) }}</span>
+                          </div>
+                        </router-link>
                       </td>
                       <td>
-                        <div class="team-cell">
-                          <img
-                            v-if="getTeamLogo(result.team_id)"
-                            :src="getTeamLogo(result.team_id) || ''"
-                            :alt="getTeamName(result.team_id)"
-                            class="team-logo"
-                          />
-                          <span>{{ getTeamName(result.team_id) }}</span>
-                        </div>
+                        <router-link
+                          :to="{ name: 'team', params: { teamId: result.team_id } }"
+                          class="team-cell-link"
+                        >
+                          <div class="team-cell">
+                            <img
+                              v-if="getTeamLogo(result.team_id)"
+                              :src="getTeamLogo(result.team_id) || ''"
+                              :alt="getTeamName(result.team_id)"
+                              class="team-logo"
+                            />
+                            <span>{{ getTeamName(result.team_id) }}</span>
+                          </div>
+                        </router-link>
                       </td>
                       <td>
                         <span
@@ -374,6 +384,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   getUpcomingRaces,
   getDoneRaces,
@@ -397,9 +408,18 @@ import {
   type RaceResultDb,
 } from '../services/ApiService';
 
+const route = useRoute();
+const router = useRouter();
+
 const props = defineProps<{
-  authenticated: boolean;
+  authenticated?: boolean;
+  raceId?: string;
 }>();
+
+// Get raceId from route params if not provided as prop
+const raceId = computed(() => {
+  return props.raceId || (route.params.raceId as string) || null;
+});
 
 const loadingUpcoming = ref(false);
 const loadingDone = ref(false);
@@ -667,21 +687,23 @@ async function handleUnregister(raceId: string) {
   }
 }
 
-async function handleStartNow(raceId: string) {
-  starting.value.set(raceId, true);
+async function handleStartNow(raceIdParam: string) {
+  starting.value.set(raceIdParam, true);
   try {
-    await startRaceNow(raceId);
+    await startRaceNow(raceIdParam);
     // Navigate to game view
+    router.push({ name: 'game' });
     emit('navigate', 'game');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to start race';
   } finally {
-    starting.value.set(raceId, false);
+    starting.value.set(raceIdParam, false);
   }
 }
 
-function handleViewRace(raceId: string) {
+function handleViewRace(raceIdParam: string) {
   // For ongoing races, just navigate to the game view without restarting
+  router.push({ name: 'game' });
   emit('navigate', 'game');
 }
 
@@ -906,11 +928,28 @@ watch(
   { immediate: false },
 );
 
+// Watch for route changes (raceId changes)
+watch(
+  () => raceId.value,
+  async (newRaceId) => {
+    if (newRaceId) {
+      // If viewing a specific race, show its results
+      await handleViewResults(newRaceId);
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(async () => {
   await loadTracks();
   await loadMyTeam();
   await loadUpcomingRaces(true);
   await loadDoneRaces(true);
+
+  // If raceId is provided, show results for that race
+  if (raceId.value) {
+    await handleViewResults(raceId.value);
+  }
 });
 </script>
 
@@ -1413,6 +1452,18 @@ onMounted(async () => {
   border-bottom: 1px solid #e0e0e0;
   color: #333;
   vertical-align: middle;
+}
+
+.driver-cell-link,
+.team-cell-link {
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.2s;
+}
+
+.driver-cell-link:hover,
+.team-cell-link:hover {
+  opacity: 0.7;
 }
 
 .driver-cell {
