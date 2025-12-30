@@ -264,7 +264,6 @@
                   <thead>
                     <tr>
                       <th>Position</th>
-                      <th>Car #</th>
                       <th>Driver</th>
                       <th>Team</th>
                       <th>Status</th>
@@ -282,8 +281,36 @@
                         'result-dnf': result.status === 'DNF',
                       }"
                     >
-                      <td class="position-cell">{{ result.final_position }}</td>
-                      <td>{{ result.car_number }}</td>
+                      <td
+                        class="position-cell"
+                        :class="{
+                          'position-1': result.final_position === 1,
+                          'position-2': result.final_position === 2,
+                          'position-3': result.final_position === 3,
+                        }"
+                      >
+                        <div class="position-content">
+                          <img
+                            v-if="result.final_position === 1"
+                            src="/assets/awards/laurels_gold.svg"
+                            alt="Gold"
+                            class="laurel-icon"
+                          />
+                          <img
+                            v-if="result.final_position === 2"
+                            src="/assets/awards/laurels_silver.svg"
+                            alt="Silver"
+                            class="laurel-icon"
+                          />
+                          <img
+                            v-if="result.final_position === 3"
+                            src="/assets/awards/laurels_bronze.svg"
+                            alt="Bronze"
+                            class="laurel-icon"
+                          />
+                          <span>{{ result.final_position }}</span>
+                        </div>
+                      </td>
                       <td>
                         <div class="driver-cell">
                           <img
@@ -1432,6 +1459,25 @@ onMounted(async () => {
   font-weight: 600;
   font-size: 1.1rem;
   text-align: center;
+}
+
+.position-cell.position-1,
+.position-cell.position-2,
+.position-cell.position-3 {
+  font-weight: 700;
+}
+
+.position-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.laurel-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .status-finished {
