@@ -1437,7 +1437,7 @@ onMounted(async () => {
 }
 
 .results-table th {
-  padding: 0.75rem 1rem;
+  padding: 0.375rem 1rem;
   text-align: left;
   font-weight: 600;
   color: #1a1a2e;
@@ -1448,7 +1448,7 @@ onMounted(async () => {
 }
 
 .results-table td {
-  padding: 0.75rem 1rem;
+  padding: 0.375rem 1rem;
   border-bottom: 1px solid #e0e0e0;
   color: #333;
   vertical-align: middle;
@@ -1459,6 +1459,7 @@ onMounted(async () => {
   text-decoration: none;
   color: inherit;
   transition: opacity 0.2s;
+  padding: 0;
 }
 
 .driver-cell-link:hover,
@@ -1490,7 +1491,8 @@ onMounted(async () => {
 .results-table .team-logo {
   width: 32px;
   height: 32px;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   border-radius: 4px;
 }
 
@@ -1573,7 +1575,7 @@ onMounted(async () => {
 
   .results-table th,
   .results-table td {
-    padding: 0.5rem 0.5rem;
+    padding: 0.25rem 0.5rem;
   }
 }
 </style>

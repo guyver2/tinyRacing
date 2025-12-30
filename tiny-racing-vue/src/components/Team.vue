@@ -133,8 +133,8 @@
                     class="car-slot"
                     :class="{ 'has-driver': getDriverForCar(car) }"
                     @drop="isEditable ? handleDrop($event, car.id) : undefined"
-                    @dragover.prevent="isEditable"
-                    @dragenter.prevent="isEditable"
+                    @dragover.prevent="isEditable ? () => {} : undefined"
+                    @dragenter.prevent="isEditable ? () => {} : undefined"
                   >
                     <div class="car-header">
                       <h5>Car #{{ car.number }}</h5>
@@ -175,7 +175,28 @@
                       >
                         {{ unseatingDriverId === getDriverForCar(car)?.id ? '...' : '×' }}
                       </button>
-                      <div class="driver-header">
+                      <router-link
+                        v-if="getDriverForCar(car)?.id"
+                        :to="{ name: 'driver', params: { driverId: getDriverForCar(car)!.id } }"
+                        class="driver-header driver-header-link"
+                      >
+                        <img
+                          v-if="getDriverForCar(car)?.avatar_url"
+                          :src="getDriverForCar(car)?.avatar_url"
+                          :alt="`${getDriverForCar(car)?.first_name} ${getDriverForCar(car)?.last_name} avatar`"
+                          class="driver-avatar"
+                        />
+                        <div class="driver-name">
+                          <h4>
+                            {{ getDriverForCar(car)?.first_name }}
+                            {{ getDriverForCar(car)?.last_name }}
+                          </h4>
+                          <span class="driver-nationality">{{
+                            getDriverForCar(car)?.nationality
+                          }}</span>
+                        </div>
+                      </router-link>
+                      <div v-else class="driver-header">
                         <img
                           v-if="getDriverForCar(car)?.avatar_url"
                           :src="getDriverForCar(car)?.avatar_url"
@@ -222,7 +243,10 @@
                     @dragstart="handleDragStart($event, subDriver.id)"
                     @dragend="handleDragEnd"
                   >
-                    <div class="driver-header">
+                    <router-link
+                      :to="{ name: 'driver', params: { driverId: subDriver.id } }"
+                      class="driver-header driver-header-link"
+                    >
                       <img
                         v-if="subDriver.avatar_url"
                         :src="subDriver.avatar_url"
@@ -233,7 +257,7 @@
                         <h4>{{ subDriver.first_name }} {{ subDriver.last_name }}</h4>
                         <span class="driver-nationality">{{ subDriver.nationality }}</span>
                       </div>
-                    </div>
+                    </router-link>
                     <DriverStatsRadarChart
                       :skill-level="subDriver.skill_level"
                       :stamina="subDriver.stamina"
@@ -1131,6 +1155,18 @@ button:disabled {
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.driver-header-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  padding: 0;
+}
+
+.driver-header-link:hover {
+  opacity: 0.8;
 }
 
 .driver-avatar {

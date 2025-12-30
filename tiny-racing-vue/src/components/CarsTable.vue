@@ -303,10 +303,12 @@ function getSpeedColor(speed: number): string {
 }
 
 .team-logo {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  object-position: center;
   flex-shrink: 0;
+  border-radius: 4px;
 }
 
 .tire-icon-container {
