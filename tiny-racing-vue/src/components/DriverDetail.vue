@@ -120,9 +120,9 @@
                   <td>{{ formatRaceDate(result.race_date) }}</td>
                   <td>
                     <router-link
-                      :to="{ name: 'races' }"
+                      :to="{ name: 'track', params: { trackId: result.track_id } }"
                       class="track-link"
-                      :title="`View race ${result.race_id}`"
+                      :title="`View track ${result.track_name}`"
                     >
                       {{ result.track_name }}
                     </router-link>

@@ -1303,6 +1303,7 @@ pub async fn get_race_results_by_driver(
         SELECT 
             rr.id as race_result_id,
             rr.race_id,
+            t.track_id,
             t.name as track_name,
             r.start_datetime as race_date,
             rr.final_position

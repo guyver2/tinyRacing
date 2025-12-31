@@ -415,6 +415,7 @@ export async function getDriver(driverId: string): Promise<DriverDb> {
 export interface DriverRaceResultDb {
   race_result_id: string;
   race_id: string;
+  track_id: string; // Track identifier (e.g., "bahrain", "monaco") used for routing
   track_name: string;
   race_date: string | null; // ISO date string or null
   final_position: number;

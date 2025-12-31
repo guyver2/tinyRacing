@@ -278,7 +278,8 @@ pub struct CreateRaceResultRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DriverRaceResultDb {
     pub race_result_id: Uuid,
-    pub race_id: Uuid, // UUID of the race, used for linking to the race page
+    pub race_id: Uuid,    // UUID of the race, used for linking to the race page
+    pub track_id: String, // Track identifier (e.g., "bahrain", "monaco") used for routing
     pub track_name: String,
     pub race_date: Option<DateTime<Utc>>, // start_datetime from race table
     pub final_position: i32,
