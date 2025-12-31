@@ -91,7 +91,14 @@
                   :class="getRaceStatusClass(race.status)"
                 >
                   <td>{{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}</td>
-                  <td>{{ getTrackName(race.track_id) }}</td>
+                  <td>
+                    <router-link
+                      :to="{ name: 'track', params: { trackId: getTrackId(race.track_id) } }"
+                      class="track-link"
+                    >
+                      {{ getTrackName(race.track_id) }}
+                    </router-link>
+                  </td>
                   <td>{{ race.laps }}</td>
                   <td>
                     <span class="status-badge" :class="getRaceStatusClass(race.status)">
@@ -192,7 +199,14 @@
                   :class="getRaceStatusClass(race.status)"
                 >
                   <td>{{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}</td>
-                  <td>{{ getTrackName(race.track_id) }}</td>
+                  <td>
+                    <router-link
+                      :to="{ name: 'track', params: { trackId: getTrackId(race.track_id) } }"
+                      class="track-link"
+                    >
+                      {{ getTrackName(race.track_id) }}
+                    </router-link>
+                  </td>
                   <td>{{ race.laps }}</td>
                   <td>
                     <span class="status-badge" :class="getRaceStatusClass(race.status)">
@@ -882,6 +896,11 @@ function getTrackName(trackId: string): string {
   return track ? track.name : 'Unknown Track';
 }
 
+function getTrackId(trackId: string): string {
+  const track = tracks.value.find((t) => t.id === trackId);
+  return track ? track.track_id : trackId;
+}
+
 function formatStatus(status: string): string {
   return status
     .replace(/_/g, ' ')
@@ -1210,32 +1229,46 @@ onMounted(async () => {
 }
 
 .status-open {
-  background-color: #e8f5e9;
+  /* background-color: #e8f5e9; */
   color: #2e7d32;
 }
 
 .status-closed {
-  background-color: #fff3e0;
+  /* background-color: #fff3e0; */
   color: #e65100;
 }
 
 .status-ongoing {
-  background-color: #e3f2fd;
+  /* background-color: #e3f2fd; */
   color: #1976d2;
 }
 
 .status-finished {
-  background-color: #f3e5f5;
+  /* background-color: #f3e5f5; */
   color: #7b1fa2;
 }
 
 .status-canceled {
-  background-color: #ffebee;
+  /* background-color: #ffebee; */
   color: #c62828;
 }
 
 .actions-cell {
   white-space: nowrap;
+}
+
+.track-link {
+  color: #2d4059;
+  text-decoration: none;
+  font-weight: 500;
+  background-color: transparent !important;
+  transition: color 0.2s ease;
+}
+
+.track-link:hover {
+  color: #1a1a2e;
+  text-decoration: none;
+  background-color: transparent !important;
 }
 
 .action-buttons {
@@ -1541,12 +1574,12 @@ onMounted(async () => {
 }
 
 .status-finished {
-  background-color: #e8f5e9;
+  /* background-color: #e8f5e9; */
   color: #2e7d32;
 }
 
 .status-dnf {
-  background-color: #ffebee;
+  /* background-color: #ffebee; */
   color: #c62828;
 }
 

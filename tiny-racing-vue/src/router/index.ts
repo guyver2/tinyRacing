@@ -47,6 +47,17 @@ const router = createRouter({
       component: () => import('../components/Market.vue'),
     },
     {
+      path: '/tracks',
+      name: 'tracks',
+      component: () => import('../components/Tracks.vue'),
+    },
+    {
+      path: '/tracks/:trackId',
+      name: 'track',
+      component: () => import('../components/TrackDetail.vue'),
+      props: true,
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../components/LoginForm.vue'),

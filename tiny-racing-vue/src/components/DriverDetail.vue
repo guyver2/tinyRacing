@@ -597,12 +597,14 @@ onMounted(() => {
   color: #2d4059;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s;
+  background-color: transparent !important;
+  transition: color 0.2s ease;
 }
 
 .track-link:hover {
   color: #1a1a2e;
-  text-decoration: underline;
+  text-decoration: none;
+  background-color: transparent !important;
 }
 
 .pagination-controls {

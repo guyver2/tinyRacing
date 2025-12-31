@@ -22,6 +22,7 @@ const navigationLinks = computed(() => [
   { name: 'My Team', view: 'my-team', requiresAuth: true },
   { name: 'All Teams', view: 'all-teams', requiresAuth: false },
   { name: 'Races', view: 'races', requiresAuth: false },
+  { name: 'Tracks', view: 'tracks', requiresAuth: false },
   { name: 'Market', view: 'market', requiresAuth: true },
 ]);
 
