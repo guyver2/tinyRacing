@@ -316,6 +316,10 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
             get(get_team_registrations),
         )
         .route("/drivers/{driver_id}", get(get_driver))
+        .route(
+            "/drivers/{driver_id}/race-results",
+            get(get_driver_race_results),
+        )
         .route("/drivers/{driver_id}/buy", post(buy_driver))
         .route("/drivers/{driver_id}/assign-car", post(assign_driver_car))
         .route("/cars/{car_id}", get(get_car))
@@ -720,6 +724,33 @@ async fn get_driver(
     let driver_response = driver_to_response(driver).await?;
 
     Ok(success(Some(driver_response), None))
+}
+
+// Get race results for a driver
+async fn get_driver_race_results(
+    Path(driver_id): Path<String>,
+    Query(params): Query<PaginationParams>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<Vec<crate::database::DriverRaceResultDb>>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+    let uuid = Uuid::parse_str(&driver_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
+
+    // Verify driver exists
+    let _driver = tdb::get_driver_by_id(pool, uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
+
+    // Get race results
+    let results = tdb::get_race_results_by_driver(pool, uuid, params.limit, params.offset)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch race results: {}", e)))?;
+
+    Ok(success(Some(results), None))
 }
 
 // Buy a driver

@@ -411,6 +411,36 @@ export async function getDriver(driverId: string): Promise<DriverDb> {
   throw new Error(data.message || 'Failed to fetch driver');
 }
 
+// Driver race result interface
+export interface DriverRaceResultDb {
+  race_result_id: string;
+  race_id: string;
+  track_name: string;
+  race_date: string | null; // ISO date string or null
+  final_position: number;
+}
+
+// Get race results for a driver
+export async function getDriverRaceResults(
+  driverId: string,
+  limit?: number,
+  offset?: number,
+): Promise<DriverRaceResultDb[]> {
+  const url = buildPaginatedUrl(`/drivers/${driverId}/race-results`, { limit, offset });
+  const response = await apiRequest(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch driver race results: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<DriverRaceResultDb[]> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to fetch driver race results');
+}
+
 // Get unassigned drivers (for market)
 export async function getUnassignedDrivers(limit?: number, offset?: number): Promise<DriverDb[]> {
   const url = buildPaginatedUrl('/drivers/unassigned', { limit, offset });

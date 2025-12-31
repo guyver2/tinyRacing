@@ -485,9 +485,16 @@ const displayUpcomingRaces = computed(() => {
 });
 
 const displayDoneRaces = computed(() => {
-  // Sort done races by created_at DESC (most recent first)
+  // Backend already sorts by start_datetime DESC, but we sort here too for consistency
+  // Sort by start_datetime (or created_at as fallback) DESC (most recent first)
   return [...doneRaces.value].sort((a, b) => {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    const dateA = a.start_datetime
+      ? new Date(a.start_datetime).getTime()
+      : new Date(a.created_at).getTime();
+    const dateB = b.start_datetime
+      ? new Date(b.start_datetime).getTime()
+      : new Date(b.created_at).getTime();
+    return dateB - dateA; // DESC order (newest first)
   });
 });
 

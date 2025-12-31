@@ -273,3 +273,13 @@ pub struct CreateRaceResultRequest {
     pub laps_completed: i32,
     pub total_distance_km: f32,
 }
+
+// Response DTO for driver race results with track and race information
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct DriverRaceResultDb {
+    pub race_result_id: Uuid,
+    pub race_id: Uuid, // UUID of the race, used for linking to the race page
+    pub track_name: String,
+    pub race_date: Option<DateTime<Utc>>, // start_datetime from race table
+    pub final_position: i32,
+}

@@ -793,13 +793,20 @@ pub async fn list_races(
     status_filter: Option<Vec<&str>>,
 ) -> Result<Vec<RaceDb>, sqlx::Error> {
     let query = if let Some(statuses) = status_filter {
+        // Determine sort order: DESC for finished/canceled races (done), ASC for upcoming races
+        let is_done = statuses
+            .iter()
+            .any(|s| *s == "FINISHED" || *s == "CANCELED");
+        let order_direction = if is_done { "DESC" } else { "ASC" };
+
         // Build a query with status filtering
         let status_placeholders: Vec<String> =
             (1..=statuses.len()).map(|i| format!("${}", i)).collect();
         let status_list = status_placeholders.join(", ");
         let base_query = format!(
-            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race WHERE status::text IN ({}) ORDER BY start_datetime ASC LIMIT ${} OFFSET ${}",
+            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race WHERE status::text IN ({}) ORDER BY COALESCE(start_datetime, created_at) {} LIMIT ${} OFFSET ${}",
             status_list,
+            order_direction,
             statuses.len() + 1,
             statuses.len() + 2
         );
@@ -814,9 +821,9 @@ pub async fn list_races(
             .fetch_all(pool)
             .await?
     } else {
-        // No status filter, return all races
+        // No status filter, return all races (ascending by default)
         sqlx::query_as::<_, RaceDb>(
-            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY start_datetime ASC LIMIT $1 OFFSET $2"
+            "SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at FROM race ORDER BY COALESCE(start_datetime, created_at) ASC LIMIT $1 OFFSET $2"
         )
         .bind(limit)
         .bind(offset)
@@ -1283,6 +1290,49 @@ pub async fn get_race_result_by_race_and_car(
     .await?;
 
     Ok(result)
+}
+
+pub async fn get_race_results_by_driver(
+    pool: &PgPool,
+    driver_id: Uuid,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DriverRaceResultDb>, sqlx::Error> {
+    let results = sqlx::query_as::<_, DriverRaceResultDb>(
+        r#"
+        SELECT 
+            rr.id as race_result_id,
+            rr.race_id,
+            t.name as track_name,
+            r.start_datetime as race_date,
+            rr.final_position
+        FROM race_result rr
+        INNER JOIN race r ON rr.race_id = r.id
+        INNER JOIN track t ON r.track_id = t.id
+        WHERE rr.driver_id = $1
+        ORDER BY COALESCE(r.start_datetime, r.created_at) DESC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(driver_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(results)
+}
+
+pub async fn count_race_results_by_driver(
+    pool: &PgPool,
+    driver_id: Uuid,
+) -> Result<i64, sqlx::Error> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM race_result WHERE driver_id = $1")
+        .bind(driver_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(count)
 }
 
 /// Save race results for all cars in a race
