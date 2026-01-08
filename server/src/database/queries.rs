@@ -216,8 +216,8 @@ pub async fn create_driver(
 ) -> Result<DriverDb, sqlx::Error> {
     let driver = sqlx::query_as::<_, DriverDb>(
         r#"
-        INSERT INTO driver (first_name, last_name, date_of_birth, nationality, gender, skill_level, stamina, weather_tolerance, experience, consistency, focus, team_id, car_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        INSERT INTO driver (first_name, last_name, date_of_birth, nationality, gender, skill_level, stamina, weather_tolerance, experience, consistency, focus, team_id, car_id, total_exp, spent_exp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *
         "#,
     )
@@ -234,6 +234,8 @@ pub async fn create_driver(
     .bind(request.focus)
     .bind(request.team_id)
     .bind(request.car_id)
+    .bind(0i32) // total_exp defaults to 0
+    .bind(0i32) // spent_exp defaults to 0
     .fetch_one(pool)
     .await?;
 
@@ -398,6 +400,63 @@ pub async fn assign_driver_to_car(
     .await?;
 
     Ok(driver)
+}
+
+/// Level up a driver by spending experience points
+/// Increases a stat by 0.1 and spends 100 experience points
+/// Stats are capped at 1.0 using LEAST() in the SQL query
+pub async fn level_up_driver(
+    pool: &PgPool,
+    driver_id: Uuid,
+    stat_name: &str,
+) -> Result<DriverDb, sqlx::Error> {
+    // First, get the current driver to check current stat values
+    let driver = get_driver_by_id(pool, driver_id)
+        .await?
+        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+
+    // Check if the stat is already at max (1.0)
+    let current_value = match stat_name {
+        "skill_level" => driver.skill_level,
+        "stamina" => driver.stamina,
+        "weather_tolerance" => driver.weather_tolerance,
+        "experience" => driver.experience,
+        "consistency" => driver.consistency,
+        "focus" => driver.focus,
+        _ => return Err(sqlx::Error::Protocol("Invalid stat name".into())),
+    };
+
+    // Check if stat is already at max (1.0) - only prevent if already at max
+    if current_value >= 1.0 {
+        return Err(sqlx::Error::Protocol(
+            format!(
+                "{} is already at maximum (1.0) and cannot be increased further",
+                stat_name
+            )
+            .into(),
+        ));
+    }
+
+    // Note: We allow leveling up even if adding 0.1 would exceed 1.0
+    // The LEAST() function in the SQL query will cap it at 1.0
+
+    // Build the update query dynamically based on stat name
+    let update_query = match stat_name {
+        "skill_level" => "UPDATE driver SET skill_level = LEAST(skill_level + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        "stamina" => "UPDATE driver SET stamina = LEAST(stamina + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        "weather_tolerance" => "UPDATE driver SET weather_tolerance = LEAST(weather_tolerance + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        "experience" => "UPDATE driver SET experience = LEAST(experience + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        "consistency" => "UPDATE driver SET consistency = LEAST(consistency + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        "focus" => "UPDATE driver SET focus = LEAST(focus + 0.1, 1.0), spent_exp = spent_exp + 100, updated_at = NOW() WHERE id = $1 RETURNING *",
+        _ => return Err(sqlx::Error::Protocol("Invalid stat name".into())),
+    };
+
+    let updated_driver = sqlx::query_as::<_, DriverDb>(update_query)
+        .bind(driver_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(updated_driver)
 }
 
 // ========== Car Queries ==========
@@ -1336,6 +1395,38 @@ pub async fn count_race_results_by_driver(
     Ok(count)
 }
 
+/// Award experience to a driver based on their race position
+/// Experience decreases from 50 points for 1st place to 5 points for 10th place
+/// Positions beyond 10th also get 5 points
+fn calculate_experience_gain(position: i32) -> i32 {
+    // Position 1 = 50 points, decreasing by 5 per position
+    // Minimum 5 points for positions 10 and beyond
+    let exp = 50 - ((position - 1) * 5);
+    exp.max(5)
+}
+
+/// Award experience to a driver after a race
+pub async fn award_driver_experience(
+    pool: &PgPool,
+    driver_id: Uuid,
+    experience_gain: i32,
+) -> Result<DriverDb, sqlx::Error> {
+    let driver = sqlx::query_as::<_, DriverDb>(
+        r#"
+        UPDATE driver
+        SET total_exp = total_exp + $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(driver_id)
+    .bind(experience_gain)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(driver)
+}
+
 /// Save race results for all cars in a race
 /// This function takes a snapshot of all cars and their final state
 pub async fn save_race_results(
@@ -1378,6 +1469,16 @@ pub async fn save_race_results(
         if let Err(e) = create_race_result(pool, request).await {
             eprintln!("Failed to save race result for car {}: {}", car.number, e);
             // Continue with other cars even if one fails
+        } else {
+            // Award experience to the driver based on position
+            let exp_gain = calculate_experience_gain(car.race_position as i32);
+            if let Err(e) = award_driver_experience(pool, car.driver.uid, exp_gain).await {
+                eprintln!(
+                    "Failed to award experience to driver {}: {}",
+                    car.driver.uid, e
+                );
+                // Continue even if experience award fails
+            }
         }
     }
 

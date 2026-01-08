@@ -51,27 +51,95 @@
               <div class="stats-grid">
                 <div class="stat-item">
                   <span class="stat-label">Skill Level:</span>
-                  <span class="stat-value">{{ driver.skill_level.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('skill_level')"
+                      @click="levelUp('skill_level')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.skill_level >= 1.0" class="max-stat-badge">MAX</span>
+                    <span class="stat-value">{{ driver.skill_level.toFixed(1) }}</span>
+                  </div>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Stamina:</span>
-                  <span class="stat-value">{{ driver.stamina.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('stamina')"
+                      @click="levelUp('stamina')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.stamina >= 1.0" class="max-stat-badge">MAX</span>
+                    <span class="stat-value">{{ driver.stamina.toFixed(1) }}</span>
+                  </div>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Experience:</span>
-                  <span class="stat-value">{{ driver.experience.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('experience')"
+                      @click="levelUp('experience')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.experience >= 1.0" class="max-stat-badge">MAX</span>
+                    <span class="stat-value">{{ driver.experience.toFixed(1) }}</span>
+                  </div>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Consistency:</span>
-                  <span class="stat-value">{{ driver.consistency.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('consistency')"
+                      @click="levelUp('consistency')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.consistency >= 1.0" class="max-stat-badge">MAX</span>
+                    <span class="stat-value">{{ driver.consistency.toFixed(1) }}</span>
+                  </div>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Focus:</span>
-                  <span class="stat-value">{{ driver.focus.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('focus')"
+                      @click="levelUp('focus')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.focus >= 1.0" class="max-stat-badge">MAX</span>
+                    <span class="stat-value">{{ driver.focus.toFixed(1) }}</span>
+                  </div>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Weather Tolerance:</span>
-                  <span class="stat-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
+                  <div class="stat-right-group">
+                    <button
+                      v-if="canLevelUp && canLevelUpStat('weather_tolerance')"
+                      @click="levelUp('weather_tolerance')"
+                      class="level-up-btn"
+                      :disabled="levelingUp"
+                    >
+                      Level Up
+                    </button>
+                    <span v-else-if="driver.weather_tolerance >= 1.0" class="max-stat-badge"
+                      >MAX</span
+                    >
+                    <span class="stat-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -84,6 +152,31 @@
                 :focus="driver.focus"
                 :weather-tolerance="driver.weather_tolerance"
               />
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="driver.total_exp !== undefined && driver.spent_exp !== undefined"
+          class="experience-section"
+        >
+          <h3>Experience & Leveling</h3>
+          <div class="experience-info">
+            <div class="experience-item">
+              <span class="experience-label">Total Experience:</span>
+              <span class="experience-value">{{ driver.total_exp }}</span>
+            </div>
+            <div class="experience-item">
+              <span class="experience-label">Spent Experience:</span>
+              <span class="experience-value">{{ driver.spent_exp }}</span>
+            </div>
+            <div class="experience-item">
+              <span class="experience-label">Available Experience:</span>
+              <span class="experience-value available">{{ availableExp }}</span>
+            </div>
+            <div class="experience-item">
+              <span class="experience-label">Available Levels:</span>
+              <span class="experience-value available">{{ availableLevels }}</span>
             </div>
           </div>
         </div>
@@ -162,6 +255,7 @@ import {
   getDriver,
   getTeam,
   getDriverRaceResults,
+  levelUpDriver,
   type DriverDb,
   type TeamDb,
   type DriverRaceResultDb,
@@ -191,6 +285,56 @@ const raceResultsError = ref('');
 const pageSize = 10;
 const currentPage = ref(1);
 const totalRaceResults = ref(0);
+
+// Level up state
+const levelingUp = ref(false);
+
+// Computed properties for experience
+const availableExp = computed(() => {
+  if (
+    !driver.value ||
+    driver.value.total_exp === undefined ||
+    driver.value.spent_exp === undefined
+  ) {
+    return 0;
+  }
+  return driver.value.total_exp - driver.value.spent_exp;
+});
+
+const availableLevels = computed(() => {
+  return Math.floor(availableExp.value / 100);
+});
+
+const canLevelUp = computed(() => {
+  return availableExp.value >= 100;
+});
+
+function canLevelUpStat(statName: string): boolean {
+  if (!driver.value) return false;
+
+  const currentValue = (() => {
+    switch (statName) {
+      case 'skill_level':
+        return driver.value!.skill_level;
+      case 'stamina':
+        return driver.value!.stamina;
+      case 'weather_tolerance':
+        return driver.value!.weather_tolerance;
+      case 'experience':
+        return driver.value!.experience;
+      case 'consistency':
+        return driver.value!.consistency;
+      case 'focus':
+        return driver.value!.focus;
+      default:
+        return 0;
+    }
+  })();
+
+  // Can level up if stat is less than 1.0 (even if adding 0.1 would reach exactly 1.0)
+  // The backend will cap it at 1.0 using LEAST()
+  return currentValue < 1.0;
+}
 
 async function loadDriver() {
   if (!driverId.value) {
@@ -309,6 +453,25 @@ watch(
     loadDriver();
   },
 );
+
+async function levelUp(stat: string) {
+  if (!driverId.value || !canLevelUp.value || levelingUp.value) {
+    return;
+  }
+
+  levelingUp.value = true;
+  try {
+    const updatedDriver = await levelUpDriver(driverId.value, stat);
+    driver.value = updatedDriver;
+    // Reload race results to ensure data is fresh
+    await loadRaceResults();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to level up driver');
+    console.error('Error leveling up driver:', err);
+  } finally {
+    levelingUp.value = false;
+  }
+}
 
 onMounted(() => {
   loadDriver();
@@ -641,6 +804,99 @@ onMounted(() => {
 .pagination-info {
   color: #666;
   font-size: 0.9rem;
+}
+
+.experience-section {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.experience-section h3 {
+  color: #2d4059;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  margin-top: 0;
+}
+
+.experience-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.experience-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.experience-label {
+  color: #666;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.experience-value {
+  color: #1a1a2e;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.experience-value.available {
+  color: #2d4059;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.125rem 0;
+  gap: 0.5rem;
+}
+
+.stat-right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.level-up-btn {
+  padding: 0.25rem 0.75rem;
+  background-color: #2d4059;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.level-up-btn:hover:not(:disabled) {
+  background-color: #1a1a2e;
+}
+
+.level-up-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.max-stat-badge {
+  padding: 0.25rem 0.75rem;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #8b6914;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
 }
 
 @media (max-width: 768px) {

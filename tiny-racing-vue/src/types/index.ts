@@ -12,6 +12,7 @@ export interface Team {
 
 export interface Driver {
   uid?: string | null;
+  id?: string | null;
   name: string;
   skill_level: number;
   stamina: number;
@@ -20,6 +21,8 @@ export interface Driver {
   consistency: number;
   focus: number;
   stress_level: number;
+  total_exp?: number;
+  spent_exp?: number;
 }
 
 export interface Car {

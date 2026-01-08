@@ -33,6 +33,8 @@ pub struct DriverDb {
     pub experience: f32,
     pub consistency: f32,
     pub focus: f32,
+    pub total_exp: i32,
+    pub spent_exp: i32,
     pub team_id: Option<Uuid>,
     pub car_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,

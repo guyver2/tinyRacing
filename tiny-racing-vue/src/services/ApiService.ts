@@ -372,6 +372,8 @@ export interface DriverDb {
   experience: number;
   consistency: number;
   focus: number;
+  total_exp: number;
+  spent_exp: number;
   team_id: string | null;
   car_id: string | null;
   created_at: string;
@@ -574,6 +576,26 @@ export async function assignDriverToCar(driverId: string, carId: string | null):
   }
 
   throw new Error(data.message || 'Failed to assign driver to car');
+}
+
+// Level up a driver by spending experience points
+export async function levelUpDriver(driverId: string, stat: string): Promise<DriverDb> {
+  const response = await apiRequest(`/drivers/${driverId}/level-up`, {
+    method: 'POST',
+    body: JSON.stringify({ stat }),
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to level up driver: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<DriverDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to level up driver');
 }
 
 // Track interfaces

@@ -322,6 +322,10 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         )
         .route("/drivers/{driver_id}/buy", post(buy_driver))
         .route("/drivers/{driver_id}/assign-car", post(assign_driver_car))
+        .route(
+            "/drivers/{driver_id}/level-up",
+            post(level_up_driver_handler),
+        )
         .route("/cars/{car_id}", get(get_car))
         .route("/cars/{car_id}/buy", post(buy_car))
         .route("/tracks/{track_id}", get(get_track))
@@ -964,6 +968,11 @@ struct AssignDriverCarRequest {
     car_id: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct LevelUpDriverRequest {
+    stat: String, // "skill_level", "stamina", "weather_tolerance", "consistency", or "focus"
+}
+
 async fn assign_driver_car(
     Path(driver_id): Path<String>,
     State(state): State<AppState>,
@@ -1078,6 +1087,134 @@ async fn assign_driver_car(
         } else {
             "Driver unassigned from car".to_string()
         }),
+    ))
+}
+
+// Level up a driver by spending experience points
+async fn level_up_driver_handler(
+    Path(driver_id): Path<String>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<LevelUpDriverRequest>,
+) -> ApiResult<Json<ApiResponse<DriverResponse>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let player_id =
+        player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+
+    // Get the player's team
+    let team = tdb::get_team_by_player(pool, player_id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
+
+    // Parse driver ID
+    let driver_uuid = Uuid::parse_str(&driver_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid driver ID format: {}", driver_id)))?;
+
+    // Get the driver
+    let driver = tdb::get_driver_by_id(pool, driver_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch driver: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Driver with ID {} not found", driver_id)))?;
+
+    // Verify driver belongs to the team
+    if driver.team_id != Some(team.id) {
+        return Err(ApiError::BadRequest(
+            "Driver does not belong to your team".to_string(),
+        ));
+    }
+
+    // Validate stat name
+    let valid_stats = [
+        "skill_level",
+        "stamina",
+        "weather_tolerance",
+        "experience",
+        "consistency",
+        "focus",
+    ];
+    if !valid_stats.contains(&request.stat.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid stat name: {}. Valid stats are: {}",
+            request.stat,
+            valid_stats.join(", ")
+        )));
+    }
+
+    // Check if driver has enough experience (100 points = 1 level)
+    let available_exp = driver.total_exp - driver.spent_exp;
+    if available_exp < 100 {
+        return Err(ApiError::BadRequest(format!(
+            "Not enough experience points. Need 100 points, but only have {} available",
+            available_exp
+        )));
+    }
+
+    // Check if the stat is already at max (1.0) - only prevent if already at max
+    let current_stat_value = match request.stat.as_str() {
+        "skill_level" => driver.skill_level,
+        "stamina" => driver.stamina,
+        "weather_tolerance" => driver.weather_tolerance,
+        "experience" => driver.experience,
+        "consistency" => driver.consistency,
+        "focus" => driver.focus,
+        _ => 0.0, // Already validated above
+    };
+
+    // Only prevent if already at max (1.0)
+    // If adding 0.1 would exceed 1.0, we allow it and the SQL will cap it at 1.0
+    if current_stat_value >= 1.0 {
+        return Err(ApiError::BadRequest(format!(
+            "{} is already at maximum (1.0) and cannot be increased further",
+            request.stat
+        )));
+    }
+
+    // Level up the driver
+    let updated_driver = tdb::level_up_driver(pool, driver_uuid, &request.stat)
+        .await
+        .map_err(|e| {
+            // Convert database errors to appropriate API errors
+            let error_msg = e.to_string();
+            if error_msg.contains("maximum") || error_msg.contains("exceed") {
+                ApiError::BadRequest(error_msg)
+            } else {
+                ApiError::InternalError(format!("Failed to level up driver: {}", e))
+            }
+        })?;
+
+    // Convert to DriverResponse with avatar
+    let driver_response = driver_to_response(updated_driver).await?;
+
+    Ok(success(
+        Some(driver_response),
+        Some(format!(
+            "Driver {} increased by 0.1. Spent 100 experience points.",
+            request.stat
+        )),
     ))
 }
 
