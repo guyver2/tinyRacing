@@ -328,6 +328,7 @@ pub fn create_api_router(race_state: SharedRaceState, db_pool: Option<PgPool>) -
         )
         .route("/cars/{car_id}", get(get_car))
         .route("/cars/{car_id}/buy", post(buy_car))
+        .route("/cars/{car_id}/improve", post(improve_car_handler))
         .route("/tracks/{track_id}", get(get_track))
         .route("/players/{player_id}", get(get_player))
         // create routes
@@ -973,6 +974,11 @@ struct LevelUpDriverRequest {
     stat: String, // "skill_level", "stamina", "weather_tolerance", "consistency", or "focus"
 }
 
+#[derive(Deserialize)]
+struct ImproveCarRequest {
+    stat: String, // "handling", "acceleration", "top_speed", "reliability", "fuel_consumption", or "tire_wear"
+}
+
 async fn assign_driver_car(
     Path(driver_id): Path<String>,
     State(state): State<AppState>,
@@ -1268,6 +1274,130 @@ async fn get_car(
         .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id)))?;
 
     Ok(success(Some(car), None))
+}
+
+// Improve a car stat by spending team cash
+async fn improve_car_handler(
+    Path(car_id): Path<String>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<ImproveCarRequest>,
+) -> ApiResult<Json<ApiResponse<serde_json::Value>>> {
+    let pool = state
+        .db_pool
+        .as_ref()
+        .ok_or_else(|| ApiError::InternalError("Database not available".to_string()))?;
+
+    // Extract token from Authorization header to get player_id
+    let player_id = if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if let Ok(claims) = crate::auth::validate_token(token) {
+                    Some(claims.sub)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let player_id =
+        player_id.ok_or_else(|| ApiError::Unauthorized("Authentication required".to_string()))?;
+
+    // Get the player's team
+    let team = tdb::get_team_by_player(pool, player_id)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch team: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound("You don't have a team yet".to_string()))?;
+
+    // Parse car ID
+    let car_uuid = Uuid::parse_str(&car_id)
+        .map_err(|_| ApiError::BadRequest(format!("Invalid car ID format: {}", car_id)))?;
+
+    // Get the car
+    let car = tdb::get_car_by_id(pool, car_uuid)
+        .await
+        .map_err(|e| ApiError::InternalError(format!("Failed to fetch car: {}", e)))?
+        .ok_or_else(|| ApiError::NotFound(format!("Car with ID {} not found", car_id)))?;
+
+    // Verify car belongs to the team
+    if car.team_id != Some(team.id) {
+        return Err(ApiError::BadRequest(
+            "Car does not belong to your team".to_string(),
+        ));
+    }
+
+    // Validate stat name
+    let valid_stats = [
+        "handling",
+        "acceleration",
+        "top_speed",
+        "reliability",
+        "fuel_consumption",
+        "tire_wear",
+    ];
+    if !valid_stats.contains(&request.stat.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid stat name: {}. Valid stats are: {}",
+            request.stat,
+            valid_stats.join(", ")
+        )));
+    }
+
+    // Improve the car
+    let (updated_car, updated_team) = tdb::improve_car(pool, car_uuid, &request.stat)
+        .await
+        .map_err(|e| {
+            // Convert database errors to appropriate API errors
+            let error_msg = e.to_string();
+            if error_msg.contains("maximum") || error_msg.contains("exceed") {
+                ApiError::BadRequest(error_msg)
+            } else if error_msg.contains("Insufficient cash") {
+                ApiError::BadRequest(error_msg)
+            } else {
+                ApiError::InternalError(format!("Failed to improve car: {}", e))
+            }
+        })?;
+
+    // Calculate cost (we need to get the old car value to calculate cost)
+    let old_car = car;
+    let current_value = match request.stat.as_str() {
+        "handling" => old_car.handling,
+        "acceleration" => old_car.acceleration,
+        "top_speed" => old_car.top_speed,
+        "reliability" => old_car.reliability,
+        "fuel_consumption" => old_car.fuel_consumption,
+        "tire_wear" => old_car.tire_wear,
+        _ => 0.0,
+    };
+    let cost = if current_value < 0.1 {
+        2
+    } else if current_value >= 0.9 {
+        100
+    } else {
+        let normalized = (current_value - 0.1) / 0.8;
+        (2.0 + normalized * 98.0) as i32
+    };
+
+    // Return both car and team
+    let response = serde_json::json!({
+        "car": updated_car,
+        "team": updated_team,
+    });
+
+    Ok(success(
+        Some(response),
+        Some(format!(
+            "Car {} increased by 0.1. Spent ${}.",
+            request.stat, cost
+        )),
+    ))
 }
 
 // Get drivers for a team

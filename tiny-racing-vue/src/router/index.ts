@@ -42,6 +42,12 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/cars/:carId',
+      name: 'car',
+      component: () => import('../components/CarDetail.vue'),
+      props: true,
+    },
+    {
       path: '/market',
       name: 'market',
       component: () => import('../components/Market.vue'),

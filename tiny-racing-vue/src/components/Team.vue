@@ -137,7 +137,12 @@
                     @dragenter.prevent="isEditable ? () => {} : undefined"
                   >
                     <div class="car-header">
-                      <h5>Car #{{ car.number }}</h5>
+                      <router-link
+                        :to="{ name: 'car', params: { carId: car.id } }"
+                        class="car-header-link"
+                      >
+                        <h5>Car #{{ car.number }}</h5>
+                      </router-link>
                     </div>
                     <div class="car-stats">
                       <div class="stat-row">
@@ -1068,8 +1073,24 @@ button:disabled {
   border-color: #4caf50;
 }
 
+.car-header {
+  margin-bottom: 1rem;
+}
+
+.car-header-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: block;
+}
+
+.car-header-link:hover {
+  opacity: 0.8;
+}
+
 .car-header h5 {
-  margin: 0 0 1rem 0;
+  margin: 0;
   color: #2d4059;
   font-size: 1.2rem;
 }

@@ -598,6 +598,47 @@ export async function levelUpDriver(driverId: string, stat: string): Promise<Dri
   throw new Error(data.message || 'Failed to level up driver');
 }
 
+// Get a single car by ID
+export async function getCar(carId: string): Promise<CarDb> {
+  const response = await apiRequest(`/cars/${carId}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch car: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<CarDb> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to fetch car');
+}
+
+// Improve a car stat by spending team cash
+export interface ImproveCarResponse {
+  car: CarDb;
+  team: TeamDb;
+}
+
+export async function improveCar(carId: string, stat: string): Promise<ImproveCarResponse> {
+  const response = await apiRequest(`/cars/${carId}/improve`, {
+    method: 'POST',
+    body: JSON.stringify({ stat }),
+  });
+
+  if (!response.ok) {
+    const errorData: ApiResponse<null> = await response.json();
+    throw new Error(errorData.message || `Failed to improve car: ${response.statusText}`);
+  }
+
+  const data: ApiResponse<ImproveCarResponse> = await response.json();
+  if (data.status === 'success' && data.data) {
+    return data.data;
+  }
+
+  throw new Error(data.message || 'Failed to improve car');
+}
+
 // Track interfaces
 export interface TrackDb {
   id: string;

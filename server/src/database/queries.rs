@@ -578,6 +578,101 @@ pub async fn update_car(
     Ok(car)
 }
 
+/// Calculate the cost to improve a car stat
+/// Cost ranges from $2 for stats below 0.1 to $100 for stats above 0.9
+fn calculate_car_improvement_cost(current_value: f32) -> i32 {
+    if current_value < 0.1 {
+        return 2;
+    } else if current_value >= 0.9 {
+        return 100;
+    } else {
+        // Linear interpolation between 0.1 and 0.9
+        let normalized = (current_value - 0.1) / 0.8; // 0 to 1
+        return (2.0 + normalized * 98.0) as i32;
+    }
+}
+
+/// Improve a car stat by spending team cash
+/// Increases a stat by 0.1 and deducts cash from the team
+/// Stats are capped at 1.0 using LEAST() in the SQL query
+pub async fn improve_car(
+    pool: &PgPool,
+    car_id: Uuid,
+    stat_name: &str,
+) -> Result<(CarDb, TeamDb), sqlx::Error> {
+    // First, get the current car to check current stat values
+    let car = get_car_by_id(pool, car_id)
+        .await?
+        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+
+    // Get the team
+    let team_id = car
+        .team_id
+        .ok_or_else(|| sqlx::Error::Protocol("Car is not assigned to a team".into()))?;
+    let team = get_team_by_id(pool, team_id)
+        .await?
+        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+
+    // Check if the stat is already at max (1.0)
+    let current_value = match stat_name {
+        "handling" => car.handling,
+        "acceleration" => car.acceleration,
+        "top_speed" => car.top_speed,
+        "reliability" => car.reliability,
+        "fuel_consumption" => car.fuel_consumption,
+        "tire_wear" => car.tire_wear,
+        _ => return Err(sqlx::Error::Protocol("Invalid stat name".into())),
+    };
+
+    // Check if stat is already at max (1.0)
+    if current_value >= 1.0 {
+        return Err(sqlx::Error::Protocol(
+            format!(
+                "{} is already at maximum (1.0) and cannot be increased further",
+                stat_name
+            )
+            .into(),
+        ));
+    }
+
+    // Calculate cost
+    let cost = calculate_car_improvement_cost(current_value);
+
+    // Check if team has enough cash
+    if team.cash < cost {
+        return Err(sqlx::Error::Protocol(
+            format!(
+                "Insufficient cash. Required: {}, Available: {}",
+                cost, team.cash
+            )
+            .into(),
+        ));
+    }
+
+    // Build the update query dynamically based on stat name
+    let update_query = match stat_name {
+        "handling" => "UPDATE car SET handling = LEAST(handling + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "acceleration" => "UPDATE car SET acceleration = LEAST(acceleration + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "top_speed" => "UPDATE car SET top_speed = LEAST(top_speed + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "reliability" => "UPDATE car SET reliability = LEAST(reliability + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "fuel_consumption" => "UPDATE car SET fuel_consumption = LEAST(fuel_consumption + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "tire_wear" => "UPDATE car SET tire_wear = LEAST(tire_wear + 0.1, 1.0), updated_at = NOW() WHERE id = $1 RETURNING *",
+        _ => return Err(sqlx::Error::Protocol("Invalid stat name".into())),
+    };
+
+    // Update car stat
+    let updated_car = sqlx::query_as::<_, CarDb>(update_query)
+        .bind(car_id)
+        .fetch_one(pool)
+        .await?;
+
+    // Deduct cash from team
+    let new_cash = team.cash - cost;
+    let updated_team = update_team_cash(pool, team_id, new_cash).await?;
+
+    Ok((updated_car, updated_team))
+}
+
 pub async fn delete_car(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
     let result = sqlx::query("DELETE FROM car WHERE id = $1")
         .bind(id)
@@ -1429,6 +1524,7 @@ pub async fn award_driver_experience(
 
 /// Save race results for all cars in a race
 /// This function takes a snapshot of all cars and their final state
+/// Also awards cash to teams based on the sum of driver XP earned
 pub async fn save_race_results(
     pool: &PgPool,
     race_id: Uuid,
@@ -1436,6 +1532,10 @@ pub async fn save_race_results(
     tick_count: u64,
     tick_duration_seconds: f32,
 ) -> Result<(), sqlx::Error> {
+    // Track XP earned per team to calculate cash rewards
+    let mut team_xp_earned: std::collections::HashMap<uuid::Uuid, i32> =
+        std::collections::HashMap::new();
+
     for car in cars.values() {
         // Calculate race time in seconds
         // For finished/DNF cars, use finished_time; for others, use current tick_count
@@ -1478,6 +1578,31 @@ pub async fn save_race_results(
                     car.driver.uid, e
                 );
                 // Continue even if experience award fails
+            } else {
+                // Track XP earned for cash calculation
+                *team_xp_earned.entry(car.team.uid).or_insert(0) += exp_gain;
+            }
+        }
+    }
+
+    // Award cash to teams based on sum of driver XP earned
+    for (team_id, total_xp) in team_xp_earned {
+        // Cash earned equals the sum of XP earned by all drivers
+        match get_team_by_id(pool, team_id).await {
+            Ok(Some(current_team)) => {
+                let new_cash = current_team.cash + total_xp;
+                if let Err(e) = update_team_cash(pool, team_id, new_cash).await {
+                    eprintln!("Failed to award cash to team {}: {}", team_id, e);
+                    // Continue even if cash award fails
+                }
+            }
+            Ok(None) => {
+                eprintln!("Team {} not found for cash award", team_id);
+                // Continue even if team not found
+            }
+            Err(e) => {
+                eprintln!("Failed to fetch team {} for cash award: {}", team_id, e);
+                // Continue even if team fetch fails
             }
         }
     }
