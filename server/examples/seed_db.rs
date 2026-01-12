@@ -575,7 +575,7 @@ async fn seed_random_cars_and_drivers(
     let mut rng = rand::rng();
 
     // Get the maximum car number to start from
-    let existing_cars = list_cars(db.pool()).await?;
+    let existing_cars = list_cars(db.pool(), 10000, 0).await?;
     let max_car_number = existing_cars.iter().map(|c| c.number).max().unwrap_or(0);
     let mut next_car_number = max_car_number + 1;
 
@@ -683,6 +683,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Connecting to database...");
     let db = Database::new(&database_url).await?;
+
+    println!("Running migrations...");
+    db.migrate().await?;
+    println!("Migrations completed!");
 
     // Seed players
     println!("\n=== Seeding Players ===");
@@ -875,13 +879,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Print summary
     println!("\n=== Seeding Summary ===");
-    let teams = list_teams(db.pool()).await?;
-    let cars = list_cars(db.pool()).await?;
-    let drivers = list_drivers(db.pool()).await?;
-    let tracks = list_tracks(db.pool()).await?;
+    let teams = list_teams(db.pool(), 10000, 0).await?;
+    let cars = list_cars(db.pool(), 10000, 0).await?;
+    let drivers = list_drivers(db.pool(), 10000, 0).await?;
+    let tracks = list_tracks(db.pool(), 10000, 0).await?;
 
-    let unassigned_cars = list_unassigned_cars(db.pool()).await?;
-    let unassigned_drivers = list_unassigned_drivers(db.pool()).await?;
+    let unassigned_cars = list_unassigned_cars(db.pool(), 10000, 0).await?;
+    let unassigned_drivers = list_unassigned_drivers(db.pool(), 10000, 0).await?;
 
     println!("Total teams in database: {}", teams.len());
     println!(

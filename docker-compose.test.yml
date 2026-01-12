@@ -1,0 +1,28 @@
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: tiny_racing_test_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tiny_racing_test
+      POSTGRES_USER: tiny_racing_test
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - tiny_racing_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiny_racing_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    networks:
+      - tiny_racing_test_network
+
+networks:
+  tiny_racing_test_network:
+    driver: bridge
+
+volumes:
+  tiny_racing_test_data:
+
