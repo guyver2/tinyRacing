@@ -53,7 +53,7 @@
                   <span class="stat-label">Skill Level:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('skill_level')"
+                      v-if="canLevelUpDriver && canLevelUpStat('skill_level')"
                       @click="levelUp('skill_level')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -68,7 +68,7 @@
                   <span class="stat-label">Stamina:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('stamina')"
+                      v-if="canLevelUpDriver && canLevelUpStat('stamina')"
                       @click="levelUp('stamina')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -83,7 +83,7 @@
                   <span class="stat-label">Experience:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('experience')"
+                      v-if="canLevelUpDriver && canLevelUpStat('experience')"
                       @click="levelUp('experience')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -98,7 +98,7 @@
                   <span class="stat-label">Consistency:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('consistency')"
+                      v-if="canLevelUpDriver && canLevelUpStat('consistency')"
                       @click="levelUp('consistency')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -113,7 +113,7 @@
                   <span class="stat-label">Focus:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('focus')"
+                      v-if="canLevelUpDriver && canLevelUpStat('focus')"
                       @click="levelUp('focus')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -128,7 +128,7 @@
                   <span class="stat-label">Weather Tolerance:</span>
                   <div class="stat-right-group">
                     <button
-                      v-if="canLevelUp && canLevelUpStat('weather_tolerance')"
+                      v-if="canLevelUpDriver && canLevelUpStat('weather_tolerance')"
                       @click="levelUp('weather_tolerance')"
                       class="level-up-btn"
                       :disabled="levelingUp"
@@ -256,6 +256,8 @@ import {
   getTeam,
   getDriverRaceResults,
   levelUpDriver,
+  isAuthenticated,
+  getPlayerId,
   type DriverDb,
   type TeamDb,
   type DriverRaceResultDb,
@@ -307,6 +309,28 @@ const availableLevels = computed(() => {
 
 const canLevelUp = computed(() => {
   return availableExp.value >= 100;
+});
+
+// Check if user can level up this driver (must be authenticated and own the team)
+const canLevelUpDriver = computed(() => {
+  // Must be authenticated
+  if (!isAuthenticated()) {
+    return false;
+  }
+
+  // Must have a team loaded
+  if (!team.value) {
+    return false;
+  }
+
+  // Must own the team
+  const currentPlayerId = getPlayerId();
+  if (!currentPlayerId || team.value.player_id !== currentPlayerId) {
+    return false;
+  }
+
+  // Must have enough experience
+  return canLevelUp.value;
 });
 
 function canLevelUpStat(statName: string): boolean {
@@ -455,7 +479,7 @@ watch(
 );
 
 async function levelUp(stat: string) {
-  if (!driverId.value || !canLevelUp.value || levelingUp.value) {
+  if (!driverId.value || !canLevelUpDriver.value || levelingUp.value) {
     return;
   }
 
