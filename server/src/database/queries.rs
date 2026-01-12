@@ -1206,6 +1206,134 @@ pub async fn finish_race(pool: &PgPool, race_id: Uuid) -> Result<RaceDb, sqlx::E
     Ok(race)
 }
 
+/// Get races that should be marked as UPCOMING (5 minutes or less before start time)
+/// This checks for races that are between 0 and 5 minutes away from start but not yet UPCOMING
+/// Uses a slightly wider window (5.5 minutes) to account for watchdog timing (runs every 60 seconds)
+pub async fn get_races_to_mark_upcoming(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+    use chrono::{Duration, Utc};
+    let now = Utc::now();
+    // Use 5.5 minutes to ensure we catch races even if the watchdog runs slightly late
+    let five_and_half_minutes_from_now = now + Duration::seconds(330); // 5.5 minutes = 330 seconds
+
+    let races = sqlx::query_as::<_, RaceDb>(
+        r#"
+        SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        FROM race
+        WHERE start_datetime IS NOT NULL
+          AND start_datetime > $1
+          AND start_datetime <= $2
+          AND status::text IN ('REGISTRATION_OPEN', 'REGISTRATION_CLOSED')
+        ORDER BY start_datetime ASC
+        LIMIT 10
+        "#,
+    )
+    .bind(now)
+    .bind(five_and_half_minutes_from_now)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(races)
+}
+
+/// Get races that should be started (start_datetime has passed but not more than 1 hour ago)
+/// Prioritizes UPCOMING races, but also includes REGISTRATION_OPEN/REGISTRATION_CLOSED races that are past start time
+pub async fn get_races_to_start(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+    use chrono::{Duration, Utc};
+    let now = Utc::now();
+    let one_hour_ago = now - Duration::hours(1);
+
+    // First, prioritize UPCOMING races that have reached their start time
+    let races = sqlx::query_as::<_, RaceDb>(
+        r#"
+        SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        FROM race
+        WHERE start_datetime IS NOT NULL
+          AND start_datetime <= $1
+          AND start_datetime > $2
+          AND status::text = 'UPCOMING'
+        ORDER BY start_datetime ASC
+        LIMIT 10
+        "#,
+    )
+    .bind(now)
+    .bind(one_hour_ago)
+    .fetch_all(pool)
+    .await?;
+
+    // If no UPCOMING races found, check for REGISTRATION_OPEN/REGISTRATION_CLOSED races past start time
+    if races.is_empty() {
+        let fallback_races = sqlx::query_as::<_, RaceDb>(
+            r#"
+            SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+            FROM race
+            WHERE start_datetime IS NOT NULL
+              AND start_datetime <= $1
+              AND start_datetime > $2
+              AND status::text IN ('REGISTRATION_OPEN', 'REGISTRATION_CLOSED')
+            ORDER BY start_datetime ASC
+            LIMIT 10
+            "#,
+        )
+        .bind(now)
+        .bind(one_hour_ago)
+        .fetch_all(pool)
+        .await?;
+
+        return Ok(fallback_races);
+    }
+
+    Ok(races)
+}
+
+/// Get races that should be canceled (start_datetime passed more than 1 hour ago and status is still REGISTRATION_OPEN, REGISTRATION_CLOSED, or UPCOMING)
+pub async fn get_races_to_cancel(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+    use chrono::{Duration, Utc};
+    let one_hour_ago = Utc::now() - Duration::hours(1);
+
+    let races = sqlx::query_as::<_, RaceDb>(
+        r#"
+        SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        FROM race
+        WHERE start_datetime IS NOT NULL
+          AND start_datetime < $1
+          AND status::text IN ('REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'UPCOMING')
+        ORDER BY start_datetime ASC
+        "#,
+    )
+    .bind(one_hour_ago)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(races)
+}
+
+/// Check if there's an ongoing race in the database (excludes UPCOMING races as they are paused)
+pub async fn has_ongoing_race(pool: &PgPool) -> Result<bool, sqlx::Error> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM race WHERE status::text = 'ONGOING'")
+        .fetch_one(pool)
+        .await?;
+
+    Ok(count > 0)
+}
+
+/// Get races that are UPCOMING and should be loaded into the game loop (visible but paused)
+pub async fn get_upcoming_races(pool: &PgPool) -> Result<Vec<RaceDb>, sqlx::Error> {
+    let races = sqlx::query_as::<_, RaceDb>(
+        r#"
+        SELECT id, track_id, laps, status::text as status, start_datetime, creator_id, description, created_at, updated_at
+        FROM race
+        WHERE status::text = 'UPCOMING'
+          AND start_datetime IS NOT NULL
+        ORDER BY start_datetime ASC
+        LIMIT 1
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(races)
+}
+
 // ========== Event Queries ==========
 
 pub async fn create_event(

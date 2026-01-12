@@ -26,7 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Ensuring Test User Exists ===");
     let test_player = match get_player_by_username(db.pool(), TEST_PLAYER).await? {
         Some(player) => {
-            println!("Test user '{}' already exists (ID: {})", player.username, player.id);
+            println!(
+                "Test user '{}' already exists (ID: {})",
+                player.username, player.id
+            );
             player
         }
         None => {
@@ -70,4 +73,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

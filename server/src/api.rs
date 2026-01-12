@@ -1531,7 +1531,12 @@ async fn get_races(
 
     // Determine status filter based on the status parameter
     let status_filter = match params.status.as_deref() {
-        Some("upcoming") => Some(vec!["REGISTRATION_OPEN", "REGISTRATION_CLOSED", "ONGOING"]),
+        Some("upcoming") => Some(vec![
+            "REGISTRATION_OPEN",
+            "REGISTRATION_CLOSED",
+            "UPCOMING",
+            "ONGOING",
+        ]),
         Some("done") => Some(vec!["FINISHED", "CANCELED"]),
         _ => None, // No filter, return all races
     };

@@ -27,6 +27,7 @@ mod api;
 mod auth;
 mod auth_middleware;
 mod constants;
+mod watchdog;
 
 // Type alias for the shared state used across threads/tasks
 type SharedRaceState = Arc<Mutex<RaceState>>;
@@ -190,6 +191,16 @@ async fn main() {
 
     // Clone db_pool for the game loop
     let game_loop_db_pool = db_pool.clone();
+
+    // Start the watchdog service if database is available
+    if let Some(ref pool) = db_pool {
+        let watchdog_db_pool = Arc::new(pool.clone());
+        let watchdog_race_state = shared_state.clone();
+        watchdog::spawn_watchdog(watchdog_db_pool, watchdog_race_state);
+        log_tx
+            .send("Race watchdog service started.".to_string())
+            .ok();
+    }
 
     // Start the API server in a separate task
     tokio::spawn(async move {
