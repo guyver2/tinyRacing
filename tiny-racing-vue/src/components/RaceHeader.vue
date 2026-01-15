@@ -1,16 +1,25 @@
 <template>
   <header>
-    <div class="race-info">
-      Race: <span>{{ trackName }}</span> Time elapsed: <span>{{ formattedElapsedTime }}</span>
+    <div class="desktop-layout">
+      <div class="race-info">
+        Race: <span>{{ trackName }}</span> Time elapsed: <span>{{ formattedElapsedTime }}</span>
+      </div>
+      <div class="race-status">
+        Status: <button @click="startStopRace">{{ raceStatus }}</button> Lap:
+        <span>{{ currentLap }}</span
+        >/<span>{{ totalLaps }}</span>
+      </div>
+      <div class="weather-container">
+        <img :src="`/assets/weather/${weather}.svg`" alt="Weather Icon" class="weather-icon" />
+        <div class="wetness-indicator">Wetness: {{ Math.round(wetness * 100) }}%</div>
+      </div>
     </div>
-    <div class="race-status">
-      Status: <button @click="startStopRace">{{ raceStatus }}</button> Lap:
-      <span>{{ currentLap }}</span
-      >/<span>{{ totalLaps }}</span>
-    </div>
-    <div class="weather-container">
-      <img :src="`/assets/weather/${weather}.svg`" alt="Weather Icon" class="weather-icon" />
-      <div class="wetness-indicator">Wetness: {{ Math.round(wetness * 100) }}%</div>
+    <div class="mobile-layout">
+      <span class="mobile-track-name">{{ trackName }}</span>
+      <span class="mobile-status">{{ raceStatus }}</span>
+      <span class="mobile-time">{{ formattedElapsedTime }}</span>
+      <span class="mobile-lap">{{ currentLap }}/{{ totalLaps }}</span>
+      <img :src="`/assets/weather/${weather}.svg`" alt="Weather Icon" class="mobile-weather-icon" />
     </div>
   </header>
 </template>
@@ -77,15 +86,29 @@ header {
   flex-shrink: 0;
   color: #141c27;
 }
+
+.desktop-layout {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+}
+
+.mobile-layout {
+  display: none;
+}
+
 .race-info {
   font-size: 1.1em;
   color: #141c27;
 }
+
 .race-status {
   text-align: right;
   font-size: 1.1em;
   color: #141c27;
 }
+
 .wetness-indicator {
   color: #141c27;
 }
@@ -107,5 +130,85 @@ button {
   border-radius: 4px;
   padding: 5px 10px;
   font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #c9d6df;
+}
+
+button:active {
+  background-color: #b8c5d0;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  header {
+    padding: 6px 8px;
+    margin-bottom: 3px;
+  }
+
+  .desktop-layout {
+    display: none;
+  }
+
+  .mobile-layout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+
+  .mobile-track-name {
+    font-weight: bold;
+    color: #141c27;
+    flex: 1 1 auto;
+    min-width: 0;
+    word-wrap: break-word;
+    line-height: 1.2;
+  }
+
+  .mobile-status {
+    color: #141c27;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .mobile-time {
+    color: #141c27;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .mobile-lap {
+    color: #141c27;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .mobile-weather-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  header {
+    padding: 5px 6px;
+  }
+
+  .mobile-layout {
+    font-size: 0.75rem;
+    gap: 6px;
+  }
+
+  .mobile-weather-icon {
+    width: 18px;
+    height: 18px;
+  }
 }
 </style>

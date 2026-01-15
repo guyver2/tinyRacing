@@ -109,7 +109,8 @@
       </div>
 
       <div class="speed-gauge-container">
-        <div class="speed-gauge">
+        <!-- Desktop: Arc gauge -->
+        <div class="speed-gauge speed-gauge-desktop">
           <svg class="speed-gauge-svg" viewBox="0 0 200 120">
             <!-- Gradient definition -->
             <defs>
@@ -147,6 +148,18 @@
           <div class="speed-value">
             <div class="speed-number">{{ Math.round(car.speed) }}</div>
             <div class="speed-unit">Km/h</div>
+          </div>
+        </div>
+        <!-- Mobile: Horizontal line gauge -->
+        <div class="speed-gauge speed-gauge-mobile">
+          <div class="speed-line-container">
+            <div class="speed-line-track">
+              <div class="speed-line-fill" :style="{ width: `${(car.speed / 400) * 100}%` }"></div>
+            </div>
+            <div class="speed-value-mobile">
+              <span class="speed-number-mobile">{{ Math.round(car.speed) }}</span>
+              <span class="speed-unit-mobile">Km/h</span>
+            </div>
           </div>
         </div>
       </div>
@@ -450,6 +463,16 @@ watch(showTireSelector, (isOpen) => {
   margin-bottom: 0;
 }
 
+@media (max-width: 768px) {
+  .control-row.second-row {
+    gap: 0.5rem;
+  }
+
+  .tire-section {
+    flex: 0 0 auto;
+  }
+}
+
 .driver-avatar-section {
   position: relative;
   flex-shrink: 0;
@@ -633,6 +656,12 @@ watch(showTireSelector, (isOpen) => {
   overflow: visible;
 }
 
+@media (max-width: 768px) {
+  .tire-section {
+    flex: 0 0 auto;
+  }
+}
+
 .tire-icon-container {
   position: relative;
   width: 64px;
@@ -813,6 +842,14 @@ watch(showTireSelector, (isOpen) => {
   justify-content: center;
 }
 
+.speed-gauge-desktop {
+  display: flex;
+}
+
+.speed-gauge-mobile {
+  display: none;
+}
+
 .speed-gauge-svg {
   position: absolute;
   top: 0;
@@ -846,5 +883,78 @@ watch(showTireSelector, (isOpen) => {
   font-size: 0.5em;
   color: #2d4059;
   margin-top: 1px;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .pit-info {
+    display: none;
+  }
+
+  .speed-gauge-container {
+    width: 100%;
+    height: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .speed-gauge-desktop {
+    display: none;
+  }
+
+  .speed-gauge-mobile {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .speed-line-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    margin-left: 0.5rem;
+  }
+
+  .speed-line-track {
+    flex: 1;
+    height: 12px;
+    background-color: #dbe2ef;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    min-width: 0;
+  }
+
+  .speed-line-fill {
+    height: 100%;
+    background: linear-gradient(to right, #e84545 0%, #f9a826 50%, #7bc74d 100%);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+
+  .speed-value-mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .speed-number-mobile {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #2d4059;
+    line-height: 1;
+  }
+
+  .speed-unit-mobile {
+    font-size: 0.65em;
+    color: #2d4059;
+    line-height: 1;
+  }
 }
 </style>

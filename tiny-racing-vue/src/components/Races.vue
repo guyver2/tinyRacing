@@ -76,12 +76,12 @@
             <table class="races-table">
               <thead>
                 <tr>
-                  <th>Race Date</th>
-                  <th>Track</th>
-                  <th>Laps</th>
-                  <th>Status</th>
-                  <th>Description</th>
-                  <th>Actions</th>
+                  <th class="mobile-visible">Race Date</th>
+                  <th class="mobile-visible">Track</th>
+                  <th class="mobile-hidden">Laps</th>
+                  <th class="mobile-hidden">Status</th>
+                  <th class="mobile-hidden">Description</th>
+                  <th class="mobile-hidden">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -89,24 +89,29 @@
                   v-for="race in displayUpcomingRaces"
                   :key="race.id"
                   :class="getRaceStatusClass(race.status)"
+                  class="race-row"
+                  @click="handleRaceRowClick(race, $event)"
                 >
-                  <td>{{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}</td>
-                  <td>
+                  <td class="mobile-visible">
+                    {{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}
+                  </td>
+                  <td class="mobile-visible">
                     <router-link
                       :to="{ name: 'track', params: { trackId: getTrackId(race.track_id) } }"
                       class="track-link"
+                      @click.stop
                     >
                       {{ getTrackName(race.track_id) }}
                     </router-link>
                   </td>
-                  <td>{{ race.laps }}</td>
-                  <td>
+                  <td class="mobile-hidden">{{ race.laps }}</td>
+                  <td class="mobile-hidden">
                     <span class="status-badge" :class="getRaceStatusClass(race.status)">
                       {{ formatStatus(race.status) }}
                     </span>
                   </td>
-                  <td>{{ race.description || 'N/A' }}</td>
-                  <td class="actions-cell">
+                  <td class="mobile-hidden">{{ race.description || 'N/A' }}</td>
+                  <td class="actions-cell mobile-hidden">
                     <!-- Registration buttons for authenticated users with a team -->
                     <div
                       v-if="
@@ -185,11 +190,11 @@
             <table class="races-table">
               <thead>
                 <tr>
-                  <th>Race Date</th>
-                  <th>Track</th>
-                  <th>Laps</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th class="mobile-visible">Race Date</th>
+                  <th class="mobile-visible">Track</th>
+                  <th class="mobile-hidden">Laps</th>
+                  <th class="mobile-hidden">Status</th>
+                  <th class="mobile-hidden">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,23 +202,28 @@
                   v-for="race in displayDoneRaces"
                   :key="race.id"
                   :class="getRaceStatusClass(race.status)"
+                  class="race-row"
+                  @click="handleRaceRowClick(race, $event)"
                 >
-                  <td>{{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}</td>
-                  <td>
+                  <td class="mobile-visible">
+                    {{ race.start_datetime ? formatDate(race.start_datetime) : 'N/A' }}
+                  </td>
+                  <td class="mobile-visible">
                     <router-link
                       :to="{ name: 'track', params: { trackId: getTrackId(race.track_id) } }"
                       class="track-link"
+                      @click.stop
                     >
                       {{ getTrackName(race.track_id) }}
                     </router-link>
                   </td>
-                  <td>{{ race.laps }}</td>
-                  <td>
+                  <td class="mobile-hidden">{{ race.laps }}</td>
+                  <td class="mobile-hidden">
                     <span class="status-badge" :class="getRaceStatusClass(race.status)">
                       {{ formatStatus(race.status) }}
                     </span>
                   </td>
-                  <td class="actions-cell">
+                  <td class="actions-cell mobile-hidden">
                     <button
                       v-if="race.status === 'FINISHED'"
                       type="button"
@@ -241,143 +251,17 @@
         </div>
 
         <!-- Race Results Modal -->
-        <div v-if="showResults" class="modal-overlay" @click="closeResults">
-          <div class="modal-content" @click.stop>
-            <div class="modal-header">
-              <div class="modal-header-content">
-                <h3>Race Results</h3>
-                <div v-if="selectedRace" class="race-details">
-                  <div class="race-detail-item">
-                    <span class="detail-label">Track:</span>
-                    <span class="detail-value">{{ getTrackName(selectedRace.track_id) }}</span>
-                  </div>
-                  <div class="race-detail-item">
-                    <span class="detail-label">Laps:</span>
-                    <span class="detail-value">{{ selectedRace.laps }}</span>
-                  </div>
-                  <div class="race-detail-item">
-                    <span class="detail-label">Date:</span>
-                    <span class="detail-value">{{
-                      selectedRace.start_datetime ? formatDate(selectedRace.start_datetime) : 'N/A'
-                    }}</span>
-                  </div>
-                </div>
-              </div>
-              <button @click="closeResults" class="btn-close" type="button" aria-label="Close">
-                ×
-              </button>
-            </div>
-            <div class="modal-body">
-              <div v-if="loadingResults" class="loading-message">Loading results...</div>
-              <div v-else-if="resultsError" class="error-message">{{ resultsError }}</div>
-              <div v-else-if="raceResults.length === 0" class="empty-state">
-                <p>No results available for this race.</p>
-              </div>
-              <div v-else class="results-table-wrapper">
-                <table class="results-table">
-                  <thead>
-                    <tr>
-                      <th>Position</th>
-                      <th>Driver</th>
-                      <th>Team</th>
-                      <th>Status</th>
-                      <th>Laps</th>
-                      <th>Time</th>
-                      <th>Distance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="result in raceResults"
-                      :key="result.id"
-                      :class="{
-                        'result-finished': result.status === 'FINISHED',
-                        'result-dnf': result.status === 'DNF',
-                      }"
-                    >
-                      <td
-                        class="position-cell"
-                        :class="{
-                          'position-1': result.final_position === 1,
-                          'position-2': result.final_position === 2,
-                          'position-3': result.final_position === 3,
-                        }"
-                      >
-                        <div class="position-content">
-                          <img
-                            v-if="result.final_position === 1"
-                            src="/assets/awards/laurels_gold.svg"
-                            alt="Gold"
-                            class="laurel-icon"
-                          />
-                          <img
-                            v-if="result.final_position === 2"
-                            src="/assets/awards/laurels_silver.svg"
-                            alt="Silver"
-                            class="laurel-icon"
-                          />
-                          <img
-                            v-if="result.final_position === 3"
-                            src="/assets/awards/laurels_bronze.svg"
-                            alt="Bronze"
-                            class="laurel-icon"
-                          />
-                          <span>{{ result.final_position }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <router-link
-                          :to="{ name: 'driver', params: { driverId: result.driver_id } }"
-                          class="driver-cell-link"
-                        >
-                          <div class="driver-cell">
-                            <img
-                              v-if="getDriverAvatar(result.driver_id)"
-                              :src="getDriverAvatar(result.driver_id) || ''"
-                              :alt="getDriverName(result.driver_id)"
-                              class="driver-avatar"
-                            />
-                            <span>{{ getDriverName(result.driver_id) }}</span>
-                          </div>
-                        </router-link>
-                      </td>
-                      <td>
-                        <router-link
-                          :to="{ name: 'team', params: { teamId: result.team_id } }"
-                          class="team-cell-link"
-                        >
-                          <div class="team-cell">
-                            <img
-                              v-if="getTeamLogo(result.team_id)"
-                              :src="getTeamLogo(result.team_id) || ''"
-                              :alt="getTeamName(result.team_id)"
-                              class="team-logo"
-                            />
-                            <span>{{ getTeamName(result.team_id) }}</span>
-                          </div>
-                        </router-link>
-                      </td>
-                      <td>
-                        <span
-                          class="status-badge"
-                          :class="{
-                            'status-finished': result.status === 'FINISHED',
-                            'status-dnf': result.status === 'DNF',
-                          }"
-                        >
-                          {{ result.status }}
-                        </span>
-                      </td>
-                      <td>{{ result.laps_completed }}</td>
-                      <td>{{ formatRaceTime(result.race_time_seconds) }}</td>
-                      <td>{{ result.total_distance_km.toFixed(2) }} km</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RaceResultsModal
+          :visible="showResults"
+          :race="selectedRace"
+          :results="raceResults"
+          :loading="loadingResults"
+          :error="resultsError"
+          :track-name="selectedRace ? getTrackName(selectedRace.track_id) : undefined"
+          :drivers="driversMap"
+          :teams="teamsMap"
+          @close="closeResults"
+        />
 
         <!-- Empty state -->
         <div
@@ -393,6 +277,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile Race Detail Popup -->
+    <MobileRaceDetailPopup
+      :visible="showMobileRaceDetail"
+      :race="selectedMobileRace"
+      :track-name="selectedMobileRace ? getTrackName(selectedMobileRace.track_id) : ''"
+      :authenticated="authenticated"
+      :my-team="myTeam"
+      :is-registered="isRegistered"
+      :registering="registering"
+      :starting="starting"
+      @close="closeMobileRaceDetail"
+      @register="handleRegister"
+      @unregister="handleUnregister"
+      @start-now="handleStartNow"
+      @view-race="handleViewRace"
+      @view-results="handleViewResults"
+    />
   </div>
 </template>
 
@@ -421,6 +323,8 @@ import {
   type RegistrationDb,
   type RaceResultDb,
 } from '../services/ApiService';
+import RaceResultsModal from './RaceResultsModal.vue';
+import MobileRaceDetailPopup from './MobileRaceDetailPopup.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -457,6 +361,10 @@ const loadingResults = ref(false);
 const resultsError = ref<string | null>(null);
 const driversMap = ref<Map<string, DriverDb>>(new Map());
 const teamsMap = ref<Map<string, TeamDb>>(new Map());
+
+// Mobile race detail popup state
+const showMobileRaceDetail = ref(false);
+const selectedMobileRace = ref<RaceDb | null>(null);
 
 // Pagination state
 const PAGE_SIZE = 10;
@@ -793,33 +701,21 @@ function closeResults() {
   teamsMap.value.clear();
 }
 
-function formatRaceTime(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(2);
-  return `${minutes}:${secs.padStart(5, '0')}`;
-}
-
-function getDriverName(driverId: string): string {
-  const driver = driversMap.value.get(driverId);
-  if (driver) {
-    return `${driver.first_name} ${driver.last_name}`;
+function handleRaceRowClick(race: RaceDb, event: MouseEvent) {
+  // Only open popup on mobile (screen width <= 768px)
+  if (window.innerWidth <= 768) {
+    openMobileRaceDetail(race);
   }
-  return `Driver ${driverId.slice(0, 8)}`;
 }
 
-function getDriverAvatar(driverId: string): string | null {
-  const driver = driversMap.value.get(driverId);
-  return driver?.avatar_url || null;
+function openMobileRaceDetail(race: RaceDb) {
+  selectedMobileRace.value = race;
+  showMobileRaceDetail.value = true;
 }
 
-function getTeamName(teamId: string): string {
-  const team = teamsMap.value.get(teamId);
-  return team?.name || `Team ${teamId.slice(0, 8)}`;
-}
-
-function getTeamLogo(teamId: string): string | null {
-  const team = teamsMap.value.get(teamId);
-  return team?.logo || null;
+function closeMobileRaceDetail() {
+  showMobileRaceDetail.value = false;
+  selectedMobileRace.value = null;
 }
 
 const isRegistered = (raceId: string): boolean => {
@@ -902,12 +798,7 @@ function getTrackId(trackId: string): string {
 }
 
 function formatStatus(status: string): string {
-  return status
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return status.replace(/_/g, ' ').toLowerCase();
 }
 
 function getRaceStatusClass(status: string): string {
@@ -1224,8 +1115,20 @@ onMounted(async () => {
   border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 500;
-  text-transform: capitalize;
   display: inline-block;
+}
+
+/* Smaller status badge in results table */
+.results-table .status-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .results-table .status-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+  }
 }
 
 .status-open {
@@ -1331,10 +1234,18 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .races-container {
+    padding: 1rem;
+  }
+
   .races-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .races-content h2 {
+    font-size: 1.5rem;
   }
 
   .create-race-button-container {
@@ -1345,19 +1256,67 @@ onMounted(async () => {
     width: 100%;
   }
 
+  .create-race-section {
+    padding: 1rem;
+  }
+
+  .create-race-section h3 {
+    font-size: 1.25rem;
+  }
+
   .races-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
+    width: 100%;
   }
 
   .races-table {
-    min-width: 600px;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .races-table th.mobile-hidden,
+  .races-table td.mobile-hidden {
+    display: none;
+  }
+
+  .races-table th.mobile-visible,
+  .races-table td.mobile-visible {
+    display: table-cell;
+  }
+
+  /* Set column widths for mobile - Both sections now have 2 columns */
+  .races-table th.mobile-visible:nth-child(1),
+  .races-table td.mobile-visible:nth-child(1) {
+    width: 40%;
+  }
+
+  .races-table th.mobile-visible:nth-child(2),
+  .races-table td.mobile-visible:nth-child(2) {
+    width: 60%;
+  }
+
+  .race-row {
+    cursor: pointer;
+  }
+
+  .race-row:active {
+    background-color: #e8e8e8;
   }
 
   .races-table th,
   .races-table td {
-    padding: 0.5rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.75rem 0.4rem;
+    font-size: 0.8rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .races-table .track-link {
+    word-break: break-word;
+  }
+
+  .section-header {
+    font-size: 1.25rem;
   }
 
   .form-actions {
@@ -1371,6 +1330,7 @@ onMounted(async () => {
   .action-buttons {
     flex-direction: column;
     width: 100%;
+    gap: 0.5rem;
   }
 
   .action-buttons .btn {
@@ -1382,240 +1342,47 @@ onMounted(async () => {
   }
 }
 
+@media (max-width: 480px) {
+  .races-container {
+    padding: 0.75rem;
+  }
+
+  .races-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .races-table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+
+  .races-table th,
+  .races-table td {
+    padding: 0.6rem 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* Both race sections - 2 columns */
+  .races-table th.mobile-visible:nth-child(1),
+  .races-table td.mobile-visible:nth-child(1) {
+    width: 40%;
+  }
+
+  .races-table th.mobile-visible:nth-child(2),
+  .races-table td.mobile-visible:nth-child(2) {
+    width: 60%;
+  }
+
+  .section-header {
+    font-size: 1.1rem;
+  }
+}
+
 .load-more-container {
   display: flex;
   justify-content: center;
   margin-top: 1.5rem;
   padding: 1rem;
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 8px;
-  max-width: 90%;
-  max-height: 90vh;
-  width: 100%;
-  max-width: 1200px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.modal-header-content {
-  flex: 1;
-}
-
-.modal-header h3 {
-  margin: 0 0 1rem 0;
-  color: #1a1a2e;
-}
-
-.race-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  margin-top: 0.5rem;
-}
-
-.race-detail-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: #666;
-  font-size: 0.875rem;
-}
-
-.detail-value {
-  color: #1a1a2e;
-  font-size: 0.875rem;
-}
-
-.modal-body {
-  padding: 1.5rem;
-  overflow-y: auto;
-  flex: 1;
-}
-
-/* Results Table Styles */
-.results-table-wrapper {
-  overflow-x: auto;
-  width: 100%;
-}
-
-.results-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-  table-layout: auto;
-  display: table;
-}
-
-.results-table th {
-  padding: 0.375rem 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: #1a1a2e;
-  border-bottom: 2px solid #e0e0e0;
-  background-color: #f5f5f5;
-  position: sticky;
-  top: 0;
-}
-
-.results-table td {
-  padding: 0.375rem 1rem;
-  border-bottom: 1px solid #e0e0e0;
-  color: #333;
-  vertical-align: middle;
-}
-
-.driver-cell-link,
-.team-cell-link {
-  text-decoration: none;
-  color: inherit;
-  transition: opacity 0.2s;
-  padding: 0;
-}
-
-.driver-cell-link:hover,
-.team-cell-link:hover {
-  opacity: 0.7;
-}
-
-.driver-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.driver-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e0e0e0;
-  flex-shrink: 0;
-}
-
-.team-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.results-table .team-logo {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 4px;
-}
-
-.results-table tbody tr:hover {
-  background-color: #f9f9f9;
-}
-
-.results-table tbody tr.result-finished {
-  border-left: 4px solid #4caf50;
-}
-
-.results-table tbody tr.result-dnf {
-  border-left: 4px solid #f44336;
-}
-
-.position-cell {
-  font-weight: 600;
-  font-size: 1.1rem;
-  text-align: center;
-}
-
-.position-cell.position-1,
-.position-cell.position-2,
-.position-cell.position-3 {
-  font-weight: 700;
-}
-
-.position-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.laurel-icon {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.status-finished {
-  /* background-color: #e8f5e9; */
-  color: #2e7d32;
-}
-
-.status-dnf {
-  /* background-color: #ffebee; */
-  color: #c62828;
-}
-
-@media (max-width: 768px) {
-  .modal-content {
-    max-width: 95%;
-    max-height: 95vh;
-  }
-
-  .modal-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .modal-header-content {
-    width: 100%;
-  }
-
-  .race-details {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .race-detail-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-  }
-
-  .results-table {
-    font-size: 0.875rem;
-  }
-
-  .results-table th,
-  .results-table td {
-    padding: 0.25rem 0.5rem;
-  }
 }
 </style>

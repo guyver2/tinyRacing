@@ -9,6 +9,7 @@
 
       <!-- Car display -->
       <div v-if="!loading && !error && car" class="car-display">
+        <button @click="goBackToTeam" class="btn-back">← Back to Team</button>
         <div class="car-header-section">
           <div class="car-icon-large">
             <img src="/assets/f1.svg" alt="Car" class="car-icon-img" />
@@ -53,7 +54,9 @@
                       Improve (${{ getImprovementCost('handling') }})
                     </button>
                     <span v-else-if="car.handling >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.handling.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.handling * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -68,7 +71,9 @@
                       Improve (${{ getImprovementCost('acceleration') }})
                     </button>
                     <span v-else-if="car.acceleration >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.acceleration.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.acceleration * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -83,7 +88,9 @@
                       Improve (${{ getImprovementCost('top_speed') }})
                     </button>
                     <span v-else-if="car.top_speed >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.top_speed.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.top_speed * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -98,7 +105,9 @@
                       Improve (${{ getImprovementCost('reliability') }})
                     </button>
                     <span v-else-if="car.reliability >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.reliability.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.reliability * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -113,7 +122,9 @@
                       Improve (${{ getImprovementCost('fuel_consumption') }})
                     </button>
                     <span v-else-if="car.fuel_consumption >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.fuel_consumption.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.fuel_consumption * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -128,7 +139,9 @@
                       Improve (${{ getImprovementCost('tire_wear') }})
                     </button>
                     <span v-else-if="car.tire_wear >= 1.0" class="max-stat-badge">MAX</span>
-                    <span class="stat-value">{{ car.tire_wear.toFixed(1) }}</span>
+                    <span class="stat-value">{{
+                      (Math.round(car.tire_wear * 100) / 100).toFixed(2)
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -152,7 +165,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   getCar,
   getTeam,
@@ -166,6 +179,7 @@ import {
 import CarStatsRadarChart from './CarStatsRadarChart.vue';
 
 const route = useRoute();
+const router = useRouter();
 const props = defineProps<{
   carId?: string;
 }>();
@@ -336,6 +350,14 @@ async function improve(stat: string) {
     console.error('Error improving car:', err);
   } finally {
     improving.value = false;
+  }
+}
+
+function goBackToTeam() {
+  if (team.value) {
+    router.push({ name: 'team', params: { teamId: team.value.id } });
+  } else {
+    router.push({ name: 'my-team' });
   }
 }
 
@@ -544,6 +566,8 @@ onMounted(() => {
   font-weight: 600;
   transition: background-color 0.2s;
   flex-shrink: 0;
+  min-width: 140px;
+  text-align: center;
 }
 
 .improve-btn:hover:not(:disabled) {
@@ -565,6 +589,22 @@ onMounted(() => {
   font-weight: 600;
   flex-shrink: 0;
   box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: #2d4059;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  transition: color 0.2s ease;
+}
+
+.btn-back:hover {
+  color: #1a1a2e;
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {

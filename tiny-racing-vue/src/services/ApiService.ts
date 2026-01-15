@@ -1,13 +1,24 @@
 const getApiUrl = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  // If it's a relative URL, use it directly (nginx will proxy it)
-  if (apiUrl.startsWith('/')) {
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  // If VITE_API_URL is explicitly set, use it
+  if (apiUrl) {
+    // If it's a relative URL, use it directly (nginx will proxy it)
+    if (apiUrl.startsWith('/')) {
+      return apiUrl;
+    }
     return apiUrl;
   }
-  return apiUrl;
+
+  // If no explicit URL is set, use the current page's hostname with port 3000
+  // This allows it to work both locally (localhost) and on the network (192.168.x.x)
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:3000`;
 };
 
-const API_URL = getApiUrl();
+// Get API URL dynamically (not cached at module load time)
+const getAPI_URL = () => getApiUrl();
 
 // Token storage key
 const TOKEN_KEY = 'jwt_token';
@@ -59,7 +70,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`${getAPI_URL()}${endpoint}`, {
     ...options,
     headers: headers as HeadersInit,
   });
@@ -88,7 +99,7 @@ export interface LoginResponse {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await fetch(`${getAPI_URL()}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -126,7 +137,7 @@ export async function register(
   email: string | undefined,
   password: string,
 ): Promise<RegisterResponse> {
-  const response = await fetch(`${API_URL}/auth/register`, {
+  const response = await fetch(`${getAPI_URL()}/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -339,7 +350,7 @@ export async function createTeam(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}/teams`, {
+  const response = await fetch(`${getAPI_URL()}/teams`, {
     method: 'POST',
     headers,
     body: formData,

@@ -151,4 +151,43 @@ onMounted(() => {
   height: 100%;
   min-height: calc(100vh - 100px);
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .placeholder-view {
+    padding: 1.5rem 1rem;
+  }
+
+  .placeholder-view h2 {
+    font-size: 1.5rem;
+  }
+
+  .placeholder-view p {
+    font-size: 1rem;
+  }
+
+  .form-view {
+    padding: 1.5rem 1rem;
+    min-height: calc(100vh - 80px);
+  }
+}
+
+@media (max-width: 480px) {
+  .placeholder-view {
+    padding: 1rem 0.75rem;
+  }
+
+  .placeholder-view h2 {
+    font-size: 1.25rem;
+  }
+
+  .placeholder-view p {
+    font-size: 0.95rem;
+  }
+
+  .form-view {
+    padding: 1rem 0.75rem;
+    min-height: calc(100vh - 70px);
+  }
+}
 </style>

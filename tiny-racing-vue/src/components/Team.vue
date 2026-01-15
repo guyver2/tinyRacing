@@ -147,27 +147,39 @@
                     <div class="car-stats">
                       <div class="stat-row">
                         <span class="stat-label">Handling:</span>
-                        <span class="stat-value">{{ car.handling.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.handling * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                       <div class="stat-row">
                         <span class="stat-label">Acceleration:</span>
-                        <span class="stat-value">{{ car.acceleration.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.acceleration * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                       <div class="stat-row">
                         <span class="stat-label">Top Speed:</span>
-                        <span class="stat-value">{{ car.top_speed.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.top_speed * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                       <div class="stat-row">
                         <span class="stat-label">Reliability:</span>
-                        <span class="stat-value">{{ car.reliability.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.reliability * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                       <div class="stat-row">
                         <span class="stat-label">Fuel Consumption:</span>
-                        <span class="stat-value">{{ car.fuel_consumption.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.fuel_consumption * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                       <div class="stat-row">
                         <span class="stat-label">Tire Wear:</span>
-                        <span class="stat-value">{{ car.tire_wear.toFixed(1) }}</span>
+                        <span class="stat-value">{{
+                          (Math.round(car.tire_wear * 100) / 100).toFixed(2)
+                        }}</span>
                       </div>
                     </div>
                     <div v-if="getDriverForCar(car)" class="driver-assigned">
@@ -263,6 +275,23 @@
                         <span class="driver-nationality">{{ subDriver.nationality }}</span>
                       </div>
                     </router-link>
+                    <!-- Mobile dropdown for assigning drivers -->
+                    <div v-if="isEditable" class="mobile-assign-dropdown">
+                      <select
+                        :value="subDriver.car_id || ''"
+                        @change="handleMobileAssign(subDriver.id, $event)"
+                        :disabled="assigningDriverId === subDriver.id"
+                        class="assign-select"
+                      >
+                        <option value="">Unassigned</option>
+                        <option v-for="car in sortedCars" :key="car.id" :value="car.id">
+                          Assign to Car #{{ car.number }}
+                        </option>
+                      </select>
+                      <span v-if="assigningDriverId === subDriver.id" class="assigning-indicator">
+                        Assigning...
+                      </span>
+                    </div>
                     <DriverStatsRadarChart
                       :skill-level="subDriver.skill_level"
                       :stamina="subDriver.stamina"
@@ -349,6 +378,7 @@ const loadingLineup = ref(false);
 const errorLineup = ref('');
 const draggedDriverId = ref<string | null>(null);
 const unseatingDriverId = ref<string | null>(null);
+const assigningDriverId = ref<string | null>(null);
 const registeredRaces = ref<RegistrationWithRaceDetails[]>([]);
 const loadingRegistrations = ref(false);
 const errorRegistrations = ref('');
@@ -460,6 +490,40 @@ async function handleUnseat(driverId: string) {
     window.scrollTo(0, scrollPosition);
   } finally {
     unseatingDriverId.value = null;
+  }
+}
+
+async function handleMobileAssign(driverId: string, event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const carId = target.value || null;
+
+  assigningDriverId.value = driverId;
+
+  // Save scroll position
+  const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+
+  try {
+    await assignDriverToCar(driverId, carId);
+    // Reload lineup to get updated data
+    if (team.value) {
+      await loadLineup(team.value.id);
+    }
+    // Restore scroll position after DOM updates
+    await nextTick();
+    window.scrollTo(0, scrollPosition);
+  } catch (err) {
+    errorLineup.value = err instanceof Error ? err.message : 'Failed to assign driver';
+    console.error('Error assigning driver:', err);
+    // Restore scroll position even on error
+    window.scrollTo(0, scrollPosition);
+    // Reset select to previous value on error
+    await nextTick();
+    const currentDriver = drivers.value.find((d) => d.id === driverId);
+    if (currentDriver) {
+      target.value = currentDriver.car_id || '';
+    }
+  } finally {
+    assigningDriverId.value = null;
   }
 }
 
@@ -1246,13 +1310,57 @@ button:disabled {
   opacity: 0.7;
 }
 
+.mobile-assign-dropdown {
+  display: none;
+  margin: 1rem 0;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.assign-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+  color: #1a1a2e;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.assign-select:focus {
+  outline: none;
+  border-color: #2d4059;
+}
+
+.assign-select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.assigning-indicator {
+  display: block;
+  margin-top: 0.5rem;
+  color: #666;
+  font-size: 0.85rem;
+  text-align: center;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
+  .teams-container {
+    padding: 1rem;
+  }
+
   .team-layout {
     grid-template-columns: 1fr;
   }
 
   .team-card {
     position: static;
+    padding: 1rem;
   }
 
   .cars-grid,
@@ -1260,9 +1368,42 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .car-stats,
+  .car-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .driver-stats {
     grid-template-columns: 1fr;
+  }
+
+  .sub-driver-card {
+    cursor: default;
+  }
+
+  .sub-driver-card[draggable='true'] {
+    cursor: default;
+  }
+
+  .mobile-assign-dropdown {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .teams-container {
+    padding: 0.75rem;
+  }
+
+  .team-card {
+    padding: 0.75rem;
+  }
+
+  .car-slot {
+    padding: 1rem;
+  }
+
+  .sub-driver-card {
+    padding: 0.75rem;
   }
 }
 </style>

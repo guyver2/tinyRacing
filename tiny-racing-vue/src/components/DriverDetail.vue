@@ -9,6 +9,7 @@
 
       <!-- Driver display -->
       <div v-if="!loading && !error && driver" class="driver-display">
+        <button @click="goBackToTeam" class="btn-back">← Back to Team</button>
         <div class="driver-header-section">
           <div class="driver-avatar-large">
             <img
@@ -200,30 +201,32 @@
             No race results found for this driver.
           </div>
           <div v-else>
-            <table class="race-results-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Track</th>
-                  <th>Position</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="result in raceResults" :key="result.race_result_id">
-                  <td>{{ formatRaceDate(result.race_date) }}</td>
-                  <td>
-                    <router-link
-                      :to="{ name: 'track', params: { trackId: result.track_id } }"
-                      class="track-link"
-                      :title="`View track ${result.track_name}`"
-                    >
-                      {{ result.track_name }}
-                    </router-link>
-                  </td>
-                  <td class="position-cell">{{ result.final_position }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="race-results-table-wrapper">
+              <table class="race-results-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Track</th>
+                    <th>Position</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="result in raceResults" :key="result.race_result_id">
+                    <td>{{ formatRaceDate(result.race_date) }}</td>
+                    <td>
+                      <router-link
+                        :to="{ name: 'track', params: { trackId: result.track_id } }"
+                        class="track-link"
+                        :title="`View track ${result.track_name}`"
+                      >
+                        {{ result.track_name }}
+                      </router-link>
+                    </td>
+                    <td class="position-cell">{{ result.final_position }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div class="pagination-controls">
               <button
                 @click="goToPage(currentPage - 1)"
@@ -250,7 +253,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   getDriver,
   getTeam,
@@ -266,6 +269,7 @@ import DriverStatsRadarChart from './DriverStatsRadarChart.vue';
 import { getCountryCode, getFlagUrl } from '@/utils/countryFlags';
 
 const route = useRoute();
+const router = useRouter();
 const props = defineProps<{
   driverId?: string;
 }>();
@@ -497,6 +501,14 @@ async function levelUp(stat: string) {
   }
 }
 
+function goBackToTeam() {
+  if (team.value) {
+    router.push({ name: 'team', params: { teamId: team.value.id } });
+  } else {
+    router.push({ name: 'my-team' });
+  }
+}
+
 onMounted(() => {
   loadDriver();
 });
@@ -507,6 +519,22 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: #2d4059;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  transition: color 0.2s ease;
+}
+
+.btn-back:hover {
+  color: #1a1a2e;
+  text-decoration: underline;
 }
 
 .driver-detail-content {
@@ -746,10 +774,16 @@ onMounted(() => {
   color: #d32f2f;
 }
 
+.race-results-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
 .race-results-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .race-results-table thead {
@@ -924,13 +958,39 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .driver-detail-container {
+    padding: 1rem;
+  }
+
   .driver-header-section {
     flex-direction: column;
     text-align: center;
+    padding: 1.5rem 1rem;
+    gap: 1.5rem;
+  }
+
+  .driver-avatar-large {
+    width: 100px;
+    height: 100px;
+  }
+
+  .driver-info h2 {
+    font-size: 1.5rem;
   }
 
   .driver-meta {
     justify-content: center;
+    flex-direction: column;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .driver-stats-section {
+    padding: 1.5rem 1rem;
+  }
+
+  .driver-stats-section h3 {
+    font-size: 1.25rem;
   }
 
   .stats-layout {
@@ -942,17 +1002,90 @@ onMounted(() => {
     order: -1;
   }
 
+  .experience-section {
+    padding: 1.5rem 1rem;
+  }
+
+  .experience-section h3 {
+    font-size: 1.25rem;
+  }
+
+  .experience-info {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .team-section {
+    padding: 1.5rem 1rem;
+  }
+
+  .team-section h3 {
+    font-size: 1.25rem;
+  }
+
+  .race-results-section {
+    padding: 1.5rem 1rem;
+  }
+
+  .race-results-section h3 {
+    font-size: 1.25rem;
+  }
+
+  .race-results-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .race-results-table {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    min-width: 100%;
   }
 
   .race-results-table th,
   .race-results-table td {
-    padding: 0.5rem;
+    padding: 0.5rem 0.4rem;
   }
 
   .pagination-controls {
     flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .pagination-btn {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .stat-item {
+    flex-wrap: wrap;
+  }
+
+  .level-up-btn {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .driver-detail-container {
+    padding: 0.75rem;
+  }
+
+  .driver-header-section {
+    padding: 1rem 0.75rem;
+  }
+
+  .driver-avatar-large {
+    width: 80px;
+    height: 80px;
+  }
+
+  .driver-info h2 {
+    font-size: 1.25rem;
+  }
+
+  .driver-meta {
+    font-size: 0.85rem;
   }
 }
 </style>

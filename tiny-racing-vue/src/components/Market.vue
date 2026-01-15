@@ -24,175 +24,201 @@
         </div>
         <!-- Drivers Section -->
         <section class="market-section">
-          <h3>Available Drivers</h3>
-          <div v-if="drivers.length === 0" class="empty-state">
-            <p>No drivers available in the market</p>
-          </div>
-          <div v-else class="items-grid">
-            <div
-              v-for="driver in drivers"
-              :key="driver.id"
-              class="market-item driver-card"
-              :class="{ expanded: expandedDrivers.has(driver.id) }"
+          <div class="section-header-with-toggle">
+            <h3>Available Drivers</h3>
+            <button
+              class="collapse-toggle"
+              @click="driversSectionCollapsed = !driversSectionCollapsed"
+              :aria-expanded="!driversSectionCollapsed"
+              aria-label="Toggle drivers section"
             >
-              <div class="item-header clickable" @click="toggleDriver(driver.id)">
-                <div class="header-content">
-                  <h4>{{ driver.first_name }} {{ driver.last_name }}</h4>
-                  <div class="header-meta">
-                    <img
-                      v-if="getCountryCode(driver.nationality)"
-                      :src="getFlagUrl(getCountryCode(driver.nationality)!)"
-                      :alt="driver.nationality"
-                      :title="driver.nationality"
-                      class="country-flag"
-                    />
-                    <span v-else class="country-flag-fallback" :title="driver.nationality">🏁</span>
-                    <span class="gender-symbol">{{ getGenderSymbol(driver.gender) }}</span>
-                    <span class="average-stat"
-                      >Avg: {{ getDriverAverageStat(driver).toFixed(1) }}</span
-                    >
+              <span class="toggle-icon" :class="{ collapsed: driversSectionCollapsed }">▼</span>
+            </button>
+          </div>
+          <div v-if="!driversSectionCollapsed">
+            <div v-if="drivers.length === 0" class="empty-state">
+              <p>No drivers available in the market</p>
+            </div>
+            <div v-else class="items-grid">
+              <div
+                v-for="driver in drivers"
+                :key="driver.id"
+                class="market-item driver-card"
+                :class="{ expanded: expandedDrivers.has(driver.id) }"
+              >
+                <div class="item-header clickable" @click="toggleDriver(driver.id)">
+                  <div class="header-content">
+                    <h4>{{ driver.first_name }} {{ driver.last_name }}</h4>
+                    <div class="header-meta">
+                      <img
+                        v-if="getCountryCode(driver.nationality)"
+                        :src="getFlagUrl(getCountryCode(driver.nationality)!)"
+                        :alt="driver.nationality"
+                        :title="driver.nationality"
+                        class="country-flag"
+                      />
+                      <span v-else class="country-flag-fallback" :title="driver.nationality"
+                        >🏁</span
+                      >
+                      <span class="gender-symbol">{{ getGenderSymbol(driver.gender) }}</span>
+                      <span class="average-stat"
+                        >Avg: {{ getDriverAverageStat(driver).toFixed(1) }}</span
+                      >
+                    </div>
+                  </div>
+                  <img
+                    v-if="driver.avatar_url"
+                    :src="driver.avatar_url"
+                    :alt="`${driver.first_name} ${driver.last_name} avatar`"
+                    class="driver-avatar"
+                    :class="{ expanded: expandedDrivers.has(driver.id) }"
+                  />
+                </div>
+                <div v-if="expandedDrivers.has(driver.id)" class="item-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Skill Level:</span>
+                    <span class="detail-value">{{ driver.skill_level.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Stamina:</span>
+                    <span class="detail-value">{{ driver.stamina.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Experience:</span>
+                    <span class="detail-value">{{ driver.experience.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Consistency:</span>
+                    <span class="detail-value">{{ driver.consistency.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Focus:</span>
+                    <span class="detail-value">{{ driver.focus.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Weather Tolerance:</span>
+                    <span class="detail-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
                   </div>
                 </div>
-                <img
-                  v-if="driver.avatar_url"
-                  :src="driver.avatar_url"
-                  :alt="`${driver.first_name} ${driver.last_name} avatar`"
-                  class="driver-avatar"
-                  :class="{ expanded: expandedDrivers.has(driver.id) }"
-                />
-              </div>
-              <div v-if="expandedDrivers.has(driver.id)" class="item-details">
-                <div class="detail-row">
-                  <span class="detail-label">Skill Level:</span>
-                  <span class="detail-value">{{ driver.skill_level.toFixed(1) }}</span>
+                <div v-if="expandedDrivers.has(driver.id)" class="buy-section">
+                  <div class="price-info">
+                    <span class="price-label">Price:</span>
+                    <span class="price-value">${{ getDriverPrice(driver) }}</span>
+                  </div>
+                  <button
+                    class="buy-button"
+                    :disabled="!canBuyDriver(driver) || buyingDriverId === driver.id"
+                    @click="handleBuyDriver(driver)"
+                  >
+                    <span v-if="buyingDriverId === driver.id">Processing...</span>
+                    <span v-else-if="!myTeam">No Team</span>
+                    <span v-else-if="!canBuyDriver(driver)">Insufficient Cash</span>
+                    <span v-else>Buy Driver</span>
+                  </button>
                 </div>
-                <div class="detail-row">
-                  <span class="detail-label">Stamina:</span>
-                  <span class="detail-value">{{ driver.stamina.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Experience:</span>
-                  <span class="detail-value">{{ driver.experience.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Consistency:</span>
-                  <span class="detail-value">{{ driver.consistency.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Focus:</span>
-                  <span class="detail-value">{{ driver.focus.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Weather Tolerance:</span>
-                  <span class="detail-value">{{ driver.weather_tolerance.toFixed(1) }}</span>
-                </div>
-              </div>
-              <div v-if="expandedDrivers.has(driver.id)" class="buy-section">
-                <div class="price-info">
-                  <span class="price-label">Price:</span>
-                  <span class="price-value">${{ getDriverPrice(driver) }}</span>
-                </div>
-                <button
-                  class="buy-button"
-                  :disabled="!canBuyDriver(driver) || buyingDriverId === driver.id"
-                  @click="handleBuyDriver(driver)"
-                >
-                  <span v-if="buyingDriverId === driver.id">Processing...</span>
-                  <span v-else-if="!myTeam">No Team</span>
-                  <span v-else-if="!canBuyDriver(driver)">Insufficient Cash</span>
-                  <span v-else>Buy Driver</span>
-                </button>
               </div>
             </div>
-          </div>
-          <div v-if="drivers.length > 0 && hasMoreDrivers" class="load-more-container">
-            <button
-              class="load-more-button"
-              :disabled="loadingMoreDrivers"
-              @click="loadMoreDrivers"
-            >
-              <span v-if="loadingMoreDrivers">Loading...</span>
-              <span v-else>Load More Drivers</span>
-            </button>
+            <div v-if="drivers.length > 0 && hasMoreDrivers" class="load-more-container">
+              <button
+                class="load-more-button"
+                :disabled="loadingMoreDrivers"
+                @click="loadMoreDrivers"
+              >
+                <span v-if="loadingMoreDrivers">Loading...</span>
+                <span v-else>Load More Drivers</span>
+              </button>
+            </div>
           </div>
         </section>
 
         <!-- Cars Section -->
         <section class="market-section">
-          <h3>Available Cars</h3>
-          <div v-if="cars.length === 0" class="empty-state">
-            <p>No cars available in the market</p>
-          </div>
-          <div v-else class="items-grid">
-            <div
-              v-for="car in cars"
-              :key="car.id"
-              class="market-item car-card"
-              :class="{ expanded: expandedCars.has(car.id) }"
+          <div class="section-header-with-toggle">
+            <h3>Available Cars</h3>
+            <button
+              class="collapse-toggle"
+              @click="carsSectionCollapsed = !carsSectionCollapsed"
+              :aria-expanded="!carsSectionCollapsed"
+              aria-label="Toggle cars section"
             >
-              <div class="item-header clickable" @click="toggleCar(car.id)">
-                <div class="header-content">
-                  <h4>Car #{{ car.number }}</h4>
-                  <div class="header-meta">
-                    <span class="item-badge">Unassigned</span>
-                    <span class="average-stat">Avg: {{ getCarAverageStat(car).toFixed(1) }}</span>
+              <span class="toggle-icon" :class="{ collapsed: carsSectionCollapsed }">▼</span>
+            </button>
+          </div>
+          <div v-if="!carsSectionCollapsed">
+            <div v-if="cars.length === 0" class="empty-state">
+              <p>No cars available in the market</p>
+            </div>
+            <div v-else class="items-grid">
+              <div
+                v-for="car in cars"
+                :key="car.id"
+                class="market-item car-card"
+                :class="{ expanded: expandedCars.has(car.id) }"
+              >
+                <div class="item-header clickable" @click="toggleCar(car.id)">
+                  <div class="header-content">
+                    <h4>Car #{{ car.number }}</h4>
+                    <div class="header-meta">
+                      <span class="item-badge">Unassigned</span>
+                      <span class="average-stat">Avg: {{ getCarAverageStat(car).toFixed(1) }}</span>
+                    </div>
+                  </div>
+                  <span class="expand-icon" :class="{ expanded: expandedCars.has(car.id) }">▼</span>
+                </div>
+                <div v-if="expandedCars.has(car.id)" class="item-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Handling:</span>
+                    <span class="detail-value">{{ car.handling.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Acceleration:</span>
+                    <span class="detail-value">{{ car.acceleration.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Top Speed:</span>
+                    <span class="detail-value">{{ car.top_speed.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Reliability:</span>
+                    <span class="detail-value">{{ car.reliability.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Fuel Consumption:</span>
+                    <span class="detail-value">{{ car.fuel_consumption.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Tire Wear:</span>
+                    <span class="detail-value">{{ car.tire_wear.toFixed(1) }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Base Performance:</span>
+                    <span class="detail-value">{{ car.base_performance.toFixed(1) }}</span>
                   </div>
                 </div>
-                <span class="expand-icon" :class="{ expanded: expandedCars.has(car.id) }">▼</span>
-              </div>
-              <div v-if="expandedCars.has(car.id)" class="item-details">
-                <div class="detail-row">
-                  <span class="detail-label">Handling:</span>
-                  <span class="detail-value">{{ car.handling.toFixed(1) }}</span>
+                <div v-if="expandedCars.has(car.id)" class="buy-section">
+                  <div class="price-info">
+                    <span class="price-label">Price:</span>
+                    <span class="price-value">${{ getCarPrice(car) }}</span>
+                  </div>
+                  <button
+                    class="buy-button"
+                    :disabled="!canBuyCar(car) || buyingCarId === car.id"
+                    @click="handleBuyCar(car)"
+                  >
+                    <span v-if="buyingCarId === car.id">Processing...</span>
+                    <span v-else-if="!myTeam">No Team</span>
+                    <span v-else-if="!canBuyCar(car)">Insufficient Cash</span>
+                    <span v-else>Buy Car</span>
+                  </button>
                 </div>
-                <div class="detail-row">
-                  <span class="detail-label">Acceleration:</span>
-                  <span class="detail-value">{{ car.acceleration.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Top Speed:</span>
-                  <span class="detail-value">{{ car.top_speed.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Reliability:</span>
-                  <span class="detail-value">{{ car.reliability.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Fuel Consumption:</span>
-                  <span class="detail-value">{{ car.fuel_consumption.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Tire Wear:</span>
-                  <span class="detail-value">{{ car.tire_wear.toFixed(1) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Base Performance:</span>
-                  <span class="detail-value">{{ car.base_performance.toFixed(1) }}</span>
-                </div>
-              </div>
-              <div v-if="expandedCars.has(car.id)" class="buy-section">
-                <div class="price-info">
-                  <span class="price-label">Price:</span>
-                  <span class="price-value">${{ getCarPrice(car) }}</span>
-                </div>
-                <button
-                  class="buy-button"
-                  :disabled="!canBuyCar(car) || buyingCarId === car.id"
-                  @click="handleBuyCar(car)"
-                >
-                  <span v-if="buyingCarId === car.id">Processing...</span>
-                  <span v-else-if="!myTeam">No Team</span>
-                  <span v-else-if="!canBuyCar(car)">Insufficient Cash</span>
-                  <span v-else>Buy Car</span>
-                </button>
               </div>
             </div>
-          </div>
-          <div v-if="cars.length > 0 && hasMoreCars" class="load-more-container">
-            <button class="load-more-button" :disabled="loadingMoreCars" @click="loadMoreCars">
-              <span v-if="loadingMoreCars">Loading...</span>
-              <span v-else>Load More Cars</span>
-            </button>
+            <div v-if="cars.length > 0 && hasMoreCars" class="load-more-container">
+              <button class="load-more-button" :disabled="loadingMoreCars" @click="loadMoreCars">
+                <span v-if="loadingMoreCars">Loading...</span>
+                <span v-else>Load More Cars</span>
+              </button>
+            </div>
           </div>
         </section>
       </div>
@@ -221,6 +247,8 @@ const loading = ref(true);
 const error = ref('');
 const expandedDrivers = ref<Set<string>>(new Set());
 const expandedCars = ref<Set<string>>(new Set());
+const driversSectionCollapsed = ref(false);
+const carsSectionCollapsed = ref(false);
 const myTeam = ref<TeamDb | null>(null);
 const buyingDriverId = ref<string | null>(null);
 const buyingCarId = ref<string | null>(null);
@@ -534,9 +562,44 @@ h2 {
 .market-section h3 {
   color: #2d4059;
   font-size: 1.5rem;
+  margin: 0;
+}
+
+.section-header-with-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e0e0e0;
+}
+
+.collapse-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  color: #2d4059;
+}
+
+.collapse-toggle:hover {
+  background-color: #f5f5f5;
+}
+
+.toggle-icon {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+  display: inline-block;
+  line-height: 1;
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(-90deg);
 }
 
 .empty-state {
@@ -831,12 +894,104 @@ h2 {
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .items-grid {
-    grid-template-columns: 1fr;
-  }
-
   .market-container {
     padding: 1rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  .market-description {
+    font-size: 1rem;
+  }
+
+  .items-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .market-item {
+    padding: 1rem;
+  }
+
+  .market-section h3 {
+    font-size: 1.25rem;
+  }
+
+  .section-header-with-toggle {
+    margin-bottom: 1rem;
+  }
+
+  .collapse-toggle {
+    padding: 0.4rem;
+  }
+
+  .toggle-icon {
+    font-size: 0.9rem;
+  }
+
+  .item-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .team-info {
+    padding: 0.75rem;
+  }
+
+  .team-info h3 {
+    font-size: 1.1rem;
+  }
+
+  .team-stats {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .buy-button {
+    padding: 0.65rem;
+    font-size: 0.95rem;
+  }
+
+  .load-more-button {
+    padding: 0.65rem 1.5rem;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .market-container {
+    padding: 0.75rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .market-description {
+    font-size: 0.95rem;
+  }
+
+  .market-item {
+    padding: 0.75rem;
+  }
+
+  .item-header h4 {
+    font-size: 1rem;
+  }
+
+  .header-meta {
+    font-size: 0.85rem;
+  }
+
+  .detail-label,
+  .detail-value {
+    font-size: 0.85rem;
+  }
+
+  .driver-avatar {
+    width: 60px;
+    height: 60px;
   }
 }
 </style>

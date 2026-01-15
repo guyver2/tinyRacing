@@ -61,4 +61,35 @@ const props = defineProps<{
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   border: 2px solid white;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .track-line-container {
+    height: 50px;
+    margin: 4px 0;
+  }
+
+  .car-marker {
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    font-size: 0.75em;
+    border-width: 1.5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .track-line-container {
+    height: 45px;
+    margin: 3px 0;
+  }
+
+  .car-marker {
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    font-size: 0.7em;
+    border-width: 1px;
+  }
+}
 </style>

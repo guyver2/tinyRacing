@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
 const props = defineProps<{
@@ -16,6 +16,17 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const route = useRoute();
+
+// Mobile menu state
+const isMobileMenuOpen = ref(false);
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
+}
 
 const navigationLinks = computed(() => [
   { name: 'Game', view: 'game', requiresAuth: false },
@@ -40,26 +51,39 @@ const isRouteActive = (viewName: string) => {
 function handleNavigate(view: string) {
   router.push({ name: view });
   emit('navigate', view);
+  closeMobileMenu(); // Close mobile menu after navigation
 }
 
 function handleLogin() {
   emit('login');
+  closeMobileMenu();
 }
 
 function handleRegister() {
   emit('register');
+  closeMobileMenu();
 }
 
 function handleLogout() {
   emit('logout');
+  closeMobileMenu();
 }
 </script>
 
 <template>
   <header class="app-header">
     <div class="header-container">
+      <!-- Mobile menu button -->
+      <button class="mobile-menu-toggle" @click="toggleMobileMenu" aria-label="Toggle menu">
+        <span class="hamburger-icon" :class="{ active: isMobileMenuOpen }">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </button>
+
       <!-- Navigation links on the left -->
-      <nav class="nav-links">
+      <nav class="nav-links" :class="{ 'mobile-open': isMobileMenuOpen }">
         <button
           v-for="link in visibleLinks"
           :key="link.view"
@@ -71,7 +95,7 @@ function handleLogout() {
       </nav>
 
       <!-- Auth actions on the right -->
-      <div class="auth-actions">
+      <div class="auth-actions" :class="{ 'mobile-open': isMobileMenuOpen }">
         <template v-if="!authenticated">
           <button class="btn btn-secondary" @click="handleRegister">Register</button>
           <button class="btn btn-primary" @click="handleLogin">Login</button>
@@ -177,32 +201,126 @@ function handleLogout() {
   background-color: #b71c1c;
 }
 
+/* Mobile menu toggle button */
+.mobile-menu-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: white;
+  z-index: 1001;
+}
+
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 24px;
+  height: 20px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-icon span {
+  width: 100%;
+  height: 2px;
+  background-color: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.hamburger-icon.active span:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.hamburger-icon.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-icon.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .header-container {
-    flex-direction: column;
+    flex-wrap: wrap;
     padding: 0.75rem 1rem;
-    gap: 1rem;
+    gap: 0;
+    position: relative;
+  }
+
+  .mobile-menu-toggle {
+    display: block;
+    order: 1;
   }
 
   .nav-links {
+    display: none;
     width: 100%;
-    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+    order: 3;
+    background-color: #1a1a2e;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .auth-actions {
-    width: 100%;
-    justify-content: center;
+  .nav-links.mobile-open {
+    display: flex;
   }
 
   .nav-link {
-    padding: 0.4rem 0.8rem;
+    padding: 0.75rem 1rem;
     font-size: 0.9rem;
+    width: 100%;
+    text-align: left;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .auth-actions {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+    order: 4;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 0.5rem;
+  }
+
+  .auth-actions.mobile-open {
+    display: flex;
   }
 
   .btn {
-    padding: 0.4rem 1rem;
+    padding: 0.75rem 1rem;
     font-size: 0.9rem;
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-container {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .nav-link {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .btn {
+    padding: 0.65rem 0.9rem;
+    font-size: 0.85rem;
   }
 }
 </style>

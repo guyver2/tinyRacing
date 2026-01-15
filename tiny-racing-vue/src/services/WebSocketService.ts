@@ -26,13 +26,23 @@ const startTime = ref(Date.now());
 let socket: WebSocket;
 
 const getWebSocketUrl = () => {
-  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:3030';
-  // If it's a relative URL, construct the WebSocket URL from current location
-  if (wsUrl.startsWith('/')) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}${wsUrl}/ws`;
+  const wsUrl = import.meta.env.VITE_WS_URL;
+
+  // If VITE_WS_URL is explicitly set, use it
+  if (wsUrl) {
+    // If it's a relative URL, construct the WebSocket URL from current location
+    if (wsUrl.startsWith('/')) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${window.location.host}${wsUrl}/ws`;
+    }
+    return `${wsUrl}/ws`;
   }
-  return `${wsUrl}/ws`;
+
+  // If no explicit URL is set, use the current page's hostname with port 3030
+  // This allows it to work both locally (localhost) and on the network (192.168.x.x)
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:3030/ws`;
 };
 
 const connectWebSocket = () => {
