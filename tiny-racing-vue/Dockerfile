@@ -14,11 +14,7 @@ COPY tiny-racing-vue/src ./src
 COPY tiny-racing-vue/index.html ./
 COPY tiny-racing-vue/tsconfig*.json ./
 COPY tiny-racing-vue/vite.config.ts ./
-COPY tiny-racing-vue/vitest.config.ts ./
-COPY tiny-racing-vue/eslint.config.ts ./
 COPY tiny-racing-vue/env.d.ts ./
-COPY tiny-racing-vue/playwright.config.ts ./
-COPY tiny-racing-vue/e2e ./e2e
 
 # Copy public directory, replacing symlink with actual assets
 COPY tiny-racing-vue/public/favicon.ico ./public/

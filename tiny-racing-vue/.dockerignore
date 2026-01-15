@@ -7,6 +7,14 @@ dist/
 .env.local
 .vscode/
 .idea/
+# Playwright tests and related files
+e2e/
+playwright.config.ts
+playwright-report/
+test-results/
+# Other test files
+vitest.config.ts
+src/**/__tests__/
 
 
 

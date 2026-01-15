@@ -1,14 +1,18 @@
-.git/
-.gitignore
-node_modules/
-dist/
-target/
-data/
-*.md
-.env
-.env.local
-.vscode/
-.idea/
-# Don't ignore assets directory - it's needed for frontend build
-!assets/
-
+# Playwright tests and related files (Vue project)
+tiny-racing-vue/e2e/
+tiny-racing-vue/playwright.config.ts
+tiny-racing-vue/playwright-report/
+tiny-racing-vue/test-results/
+# Other test files (Vue project)
+tiny-racing-vue/vitest.config.ts
+tiny-racing-vue/src/**/__tests__/
+# Common ignores
+**/node_modules/
+**/dist/
+**/.git/
+**/.gitignore
+**/*.md
+**/.env
+**/.env.local
+**/.vscode/
+**/.idea/
