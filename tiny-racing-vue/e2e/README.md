@@ -250,7 +250,7 @@ To update the seed data, modify `server/examples/seed_db.rs` or create a test-sp
 
 1. Create a new test file in `e2e/`
 2. Add test cases following the existing pattern
-3. Update `TESTING_PLAN.md` with new coverage
+3. Update this README if test infrastructure or coverage expectations change
 4. Add screenshots for visual regression
 
 ### Debugging

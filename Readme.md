@@ -1,6 +1,8 @@
 # Tiny Racing
 
-A text-based Formula 1 race simulation game written in Rust.
+> **Documentation:** Full product, API, and architecture docs for humans and AI agents live in [`docs/`](docs/) and [`AGENTS.md`](AGENTS.md). This README is a short intro; some run instructions below may be outdated.
+
+A team-management Formula 1 race simulation: manage drivers and cars, register for races, and control pit strategy during live events. Backend in Rust; web UI in Vue 3.
 
 ## Features
 
@@ -24,11 +26,13 @@ A text-based Formula 1 race simulation game written in Rust.
 2. Build the simulation app. `cd server && cargo build --release`
 3. Install the web client dependencies. `cd tiny-racing-vue && npm install`
 
-### Running
+### Running (development)
 
-1. Run the simulation locally. `cd server && cargo run -- track.json`
-2. (optional) Run the simple http server for json and svg assets. `python tiny-racing-vue/server.py`
-3. (optional) Run the Vue.js web client. `cd tiny-racing-vue && npm run dev`
+1. Start PostgreSQL and set `DATABASE_URL` (see `server/DATABASE_SETUP.md`).
+2. Run the server: `cd server && cargo run` (REST on port 3000, WebSocket on 3030).
+3. Run the Vue client: `cd tiny-racing-vue && npm run dev`.
+
+For Docker: see [`DOCKER.md`](DOCKER.md).
 
 
 ### Screenshots
